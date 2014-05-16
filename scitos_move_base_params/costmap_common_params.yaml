@@ -36,6 +36,28 @@ obstacle_layer:
   
   laser: {sensor_frame: base_laser_link, data_type: LaserScan, topic: scan, marking: true, clearing: true}
   
+  track_unknown_space: true
+  combination_method: 0
 
-
+dynamic_layer:
+    
+  #    low:      how fast shall we forget?
+  #    high:     how fast shall we believe
+  #    low2:     how fast shall we introduce a new object into the static map?
+    
+  stat_low: 0.4
+  stat_low2: 0.51
+  stat_high: 0.6
+  dyn_low: 0.2
+  dyn_high: 0.99
+    
+  # has to be n*0.05
+  # good results with 0.2 and 0.5
+  resolution_subsampling: 0.2
+    
+  # flags
+  init_static_map_blank: false
+  debug_flag: false
+  publish_fine_map: true
+  publish_block_map: true
   

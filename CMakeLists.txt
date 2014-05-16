@@ -4,7 +4,7 @@ project(scitos_2d_navigation)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp sensor_msgs std_msgs pcl_ros tf)
+find_package(catkin REQUIRED roscpp sensor_msgs std_msgs pcl_ros tf costmap_2d dynamic_reconfigure)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -52,10 +52,10 @@ add_definitions(${PCL_DEFINITIONS})
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES scitos_2d_navigation
-#  CATKIN_DEPENDS other_catkin_pkg
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES dynamic_layer
+  CATKIN_DEPENDS costmap_2d dynamic_reconfigure roscpp
+  DEPENDS system_lib
 )
 
 ###########
@@ -67,11 +67,13 @@ catkin_package(
 # include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  include
 )
 
 ## Declare a cpp library
 #add_library(noise_voxel_grid src/noise_voxel_grid.cpp)
 add_library(noise_approximate_voxel_grid src/noise_approximate_voxel_grid.cpp)
+add_library(dynamic_layer plugins/dynamic_layer.cpp)
 
 ## Declare a cpp executable
 add_executable(subsample_cloud src/subsample_cloud.cpp)
@@ -81,6 +83,7 @@ add_executable(mirror_floor_points src/mirror_floor_points.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(scitos_2d_navigation_node scitos_2d_navigation_generate_messages_cpp)
+add_dependencies(dynamic_layer plugins/dynamic_layer.cpp)
 
 target_link_libraries(noise_approximate_voxel_grid
   ${PCL_LIBRARIES}

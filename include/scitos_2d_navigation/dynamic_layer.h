@@ -81,7 +81,17 @@ private:
     double resolution_xxl;
     int n_cells;
     int n_cells_xxl;
+    int max_cells_x;
+    int max_cells_y;
+    int max_cells_xxl_x;
+    int max_cells_xxl_y;
     int mod_number;
+    int master_grid_width;
+    int master_grid_height;
+    double master_grid_origin_x;
+    double master_grid_origin_y;
+    double master_grid_orientation;
+    double master_grid_resolution;
     
     // flags
     bool flag_init;

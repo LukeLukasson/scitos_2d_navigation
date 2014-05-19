@@ -68,12 +68,18 @@ void DynamicLayer::onInitialize()
     nh.param("init_static_map_blank", init_fine_blank, false);
     nh.param("publish_fine_map", publish_fine_map, false);
     nh.param("publish_block_map", publish_block_map, false);
+    nh.param("publish_input_map", publish_input_map, false);
+    
+    if(publish_input_map) {
+        inputMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/input_map", 10);
+    }
     
     // assign seq numbers to maps
     staticMap_seq = 1;
     staticMap_xxl_seq = 2;
     dynamicMap_seq = 3;
     dynamicMap_xxl_seq = 4;
+    if(publish_input_map) inputMap_seq = 5;
     
     // parameters algorithm
     lower_bound = 0.1;                            // free space below 0.1 prob
@@ -190,6 +196,27 @@ void DynamicLayer::initDynamicMapXxl()
     dynamicMap_xxl.header.seq = dynamicMap_xxl_seq;
 }
 
+
+// initialize input map
+void DynamicLayer::initInputMap()
+{    
+    if(debug) ROS_WARN("+++ Initializing input map");
+    
+    // handeling nav_msgs/MapMetaData
+    inputMap.info.resolution = master_grid_resolution;                                                                 // float32
+    inputMap.info.width = width;                                                      // uint32
+    inputMap.info.height = height;                                                     // uint32
+    inputMap.info.origin.position.x = std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
+    inputMap.info.origin.position.y = std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
+    inputMap.info.origin.orientation.w = master_grid_orientation;                                                      // same orientation as /map
+    int p[n_cells];
+    std::vector<signed char> a(p, p+n_cells);
+    inputMap.data = a;
+    
+    // get initializer
+    inputMap.header.seq = inputMap_seq;
+}
+
 // push values of matrix to OccupancyGrid of map
 void DynamicLayer::publishMap(nav_msgs::OccupancyGrid &map, Eigen::MatrixXf &matrix, int cells)
 {
@@ -222,6 +249,8 @@ void DynamicLayer::publishMap(nav_msgs::OccupancyGrid &map, Eigen::MatrixXf &mat
         dynamicMapPub.publish(map);
     } else if(map.header.seq == dynamicMap_xxl_seq) {
         dynamicMapXxlPub.publish(map);
+    } else if(map.header.seq == inputMap_seq) {
+        inputMapPub.publish(map);
     }
     
     if(debug)
@@ -604,7 +633,9 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
             publishMap(staticMap_xxl, staticMap_xxl_matrix, n_cells_xxl);
             publishMap(dynamicMap_xxl, dynamicMap_xxl_matrix, n_cells_xxl);
         }
-        
+        if(publish_input_map) {
+            publishMap(inputMap, inputData_matrix, n_cells);
+        }
         // for debugging input
         //~ publishMap(staticMap, inputData_matrix, n_cells);
         //~ publishMap(staticMap_xxl, inputData_xxl_matrix, n_cells_xxl);
@@ -650,6 +681,12 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
             initStaticMapXxl();
             initDynamicMapXxl();
         }
+        
+        // init publishing raw input
+        if(publish_input_map) {
+            initInputMap();
+        }
+        
         // only do that once
         flag_init = true;
     }

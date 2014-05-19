@@ -44,6 +44,7 @@ private:
     void initStaticMapXxl();
     void initDynamicMap();
     void initDynamicMapXxl();
+    void initInputMap();
     void transformMapToMatrix(int world_x, int world_y, int &map_x, int &map_y);
     void updateMaps(Eigen::MatrixXf &meas_mat, const int min_x, const int min_y, const int max_x, const int max_y, const bool xxl);
 
@@ -58,12 +59,14 @@ private:
     nav_msgs::OccupancyGrid staticMap_xxl;
     nav_msgs::OccupancyGrid dynamicMap;
     nav_msgs::OccupancyGrid dynamicMap_xxl;
+    nav_msgs::OccupancyGrid inputMap;
     
     // identifier
     int staticMap_seq;
     int staticMap_xxl_seq;
     int dynamicMap_seq;
     int dynamicMap_xxl_seq;
+    int inputMap_seq;
     
     // ROS handles
     ros::NodeHandle nh;
@@ -71,6 +74,7 @@ private:
     ros::Publisher staticMapXxlPub;
     ros::Publisher dynamicMapPub;
     ros::Publisher dynamicMapXxlPub;
+    ros::Publisher inputMapPub;
 
     // grid data
     int height;
@@ -95,11 +99,12 @@ private:
     
     // flags
     bool flag_init;
-    bool debug;
     bool init_fine_blank;
-    // debugging flags
     bool publish_fine_map;
-    bool publish_block_map;
+    bool publish_block_map;    
+    // debugging flags
+    bool debug;
+    bool publish_input_map;
 
     // parameters algorithm
     float lower_bound;

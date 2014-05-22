@@ -57,10 +57,10 @@ void DynamicLayer::onInitialize()
     
     // Luke
     // define publisher
-    staticMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/static_map", 10);
-    staticMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("/static_map_xxl", 10);
-    dynamicMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/dynamic_map", 10);
-    dynamicMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("/dynamic_map_xxl", 10);
+    staticMapPub = nh.advertise<nav_msgs::OccupancyGrid>("static_map", 10);
+    staticMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("static_map_xxl", 10);
+    dynamicMapPub = nh.advertise<nav_msgs::OccupancyGrid>("dynamic_map", 10);
+    dynamicMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("dynamic_map_xxl", 10);
 
     // flags
     flag_init = false;
@@ -71,7 +71,7 @@ void DynamicLayer::onInitialize()
     nh.param("publish_input_map", publish_input_map, false);
     
     if(publish_input_map) {
-        inputMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/input_map", 10);
+        inputMapPub = nh.advertise<nav_msgs::OccupancyGrid>("input_map", 10);
     }
     
     // assign seq numbers to maps
@@ -692,8 +692,9 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
     }
     
 
-    
-    //~ layered_costmap->setCost(3, 3, 254); // does not do anything... ???
+    //~ planner_costmap_ros_->resetMapOutsideWindow(0,0);
+    //~ controller_costmap_ros_->resetMapOutsideWindow(0,0);
+    //~ layered_costmap_->setCost(3, 3, LETHAL_OBSTACLE); // does not do anything... ???
     if(debug)
         ROS_INFO_STREAM("Counter: " << counter << " NO_INFO means: " << (int)NO_INFORMATION);
 }

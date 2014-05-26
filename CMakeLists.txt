@@ -4,7 +4,7 @@ project(scitos_2d_navigation)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp sensor_msgs std_msgs pcl_ros tf costmap_2d dynamic_reconfigure)
+find_package(catkin REQUIRED roscpp rospy sensor_msgs std_msgs pcl_ros tf costmap_2d dynamic_reconfigure)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -18,6 +18,11 @@ add_definitions(${PCL_DEFINITIONS})
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
 # catkin_python_setup()
+
+## Add dynamic reconfigure API
+generate_dynamic_reconfigure_options(
+  cfg/dynamic_layer_params.cfg
+)
 
 #######################################
 ## Declare ROS messages and services ##
@@ -84,6 +89,9 @@ add_executable(mirror_floor_points src/mirror_floor_points.cpp)
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(scitos_2d_navigation_node scitos_2d_navigation_generate_messages_cpp)
 add_dependencies(dynamic_layer plugins/dynamic_layer.cpp)
+# please do not as me why... black magic maybe?
+add_dependencies(dynamic_layer dynamic_layer_gencfg)
+
 
 target_link_libraries(noise_approximate_voxel_grid
   ${PCL_LIBRARIES}

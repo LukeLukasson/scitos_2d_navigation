@@ -8,9 +8,9 @@
 
 // Luke
 #include <iostream>
-#include "../Eigen/Dense" // adjusted path
+#include "../Eigen/Dense"                                       // adjusted path
 #include <nav_msgs/OccupancyGrid.h>
-
+#include <scitos_2d_navigation/dynamic_layer_paramsConfig.h>    // dynamic reconfigure header
 
 namespace scitos_2d_navigation
 {
@@ -34,10 +34,10 @@ public:
     virtual void matchSize();
   
 private:
-    void reconfigureCB(costmap_2d::GenericPluginConfig &config, uint32_t level);
-    dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig> *dsrv_;
+    // configure dynamic parameters
+    void reconfigureCB(scitos_2d_navigation::dynamic_layer_paramsConfig &config, uint32_t level);
+    dynamic_reconfigure::Server<scitos_2d_navigation::dynamic_layer_paramsConfig> *dsrv_;
 
-    // Luke
     // worker functions
     void publishMap(nav_msgs::OccupancyGrid &map, Eigen::MatrixXf &matrix, int cells);
     void initStaticMap();
@@ -99,6 +99,9 @@ private:
     
     // flags
     bool flag_init;
+    bool flag_init_fine;
+    bool flag_init_block;
+    bool flag_init_input;
     bool init_fine_blank;
     bool publish_fine_map;
     bool publish_block_map;    
@@ -113,6 +116,11 @@ private:
     float map_min_value;
     float map_max_value;
     
+    double stat_high;
+    double stat_low;
+    double stat_low2;
+    double dyn_high;
+    double dyn_low;
     double stat_High;
     double stat_Low;
     double stat_Low2;

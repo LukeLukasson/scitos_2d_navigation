@@ -1,7 +1,6 @@
 #include <scitos_2d_navigation/dynamic_layer.h>
 #include <pluginlib/class_list_macros.h>
 
-// debug
 #include "std_msgs/String.h"
 #include <vector>               // needed for updating map
 #include <map>                  // needed for converting Eigen matrix to array
@@ -22,7 +21,6 @@ using Eigen::VectorXi;
 /* ToDo
  * ====
  * 
- * o Handle resolution and size of /map generically
  * o Clean up code
  * o Check SUPER HACK things
  * 
@@ -50,29 +48,22 @@ void DynamicLayer::onInitialize()
     default_value_ = NO_INFORMATION;
     matchSize();
 
-    dsrv_ = new dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig>(nh);
-    dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig>::CallbackType cb = boost::bind(
+    // configure dynamic parameters
+    dsrv_ = new dynamic_reconfigure::Server<scitos_2d_navigation::dynamic_layer_paramsConfig>(nh);
+    dynamic_reconfigure::Server<scitos_2d_navigation::dynamic_layer_paramsConfig>::CallbackType cb = boost::bind(
       &DynamicLayer::reconfigureCB, this, _1, _2);
     dsrv_->setCallback(cb);
-    
-    // Luke
-    // define publisher
-    staticMapPub = nh.advertise<nav_msgs::OccupancyGrid>("static_map", 10);
-    staticMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("static_map_xxl", 10);
-    dynamicMapPub = nh.advertise<nav_msgs::OccupancyGrid>("dynamic_map", 10);
-    dynamicMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("dynamic_map_xxl", 10);
 
     // flags
     flag_init = false;
+    flag_init_fine = false;
+    flag_init_block = false;
+    flag_init_input = false;
     nh.param("debug_flag", debug, false);
     nh.param("init_static_map_blank", init_fine_blank, false);
     nh.param("publish_fine_map", publish_fine_map, false);
     nh.param("publish_block_map", publish_block_map, false);
     nh.param("publish_input_map", publish_input_map, false);
-    
-    if(publish_input_map) {
-        inputMapPub = nh.advertise<nav_msgs::OccupancyGrid>("input_map", 10);
-    }
     
     // assign seq numbers to maps
     staticMap_seq = 1;
@@ -97,13 +88,13 @@ void DynamicLayer::onInitialize()
     map_min_value = (float)map_min_value_server;
     map_max_value = (float)map_max_value_server;
     
-    double stat_low, stat_high, stat_low2, dyn_low, dyn_high;
     nh.param("stat_low", stat_low, 0.4);        // how fast shall it vanish?
     stat_Low = stat_low/(1-stat_low);
-    nh.param("stat_high", stat_high, 0.9);        // how fast shall we believe?
-    stat_High = stat_high/(1-stat_high);
     nh.param("stat_low2", stat_low2, 0.52);        // introduce static dynamic obstacle into static map
     stat_Low2 = stat_low2/(1-stat_low2);
+    nh.param("stat_high", stat_high, 0.9);        // how fast shall we believe?
+    stat_High = stat_high/(1-stat_high);
+
     
     nh.param("dyn_low", dyn_low, 0.2);            // how fast shall it vanish?
     dyn_Low = dyn_low/(1-dyn_low);
@@ -196,7 +187,6 @@ void DynamicLayer::initDynamicMapXxl()
     dynamicMap_xxl.header.seq = dynamicMap_xxl_seq;
 }
 
-
 // initialize input map
 void DynamicLayer::initInputMap()
 {    
@@ -265,7 +255,6 @@ void DynamicLayer::transformMapToMatrix(int map_x, int map_y, int &matrix_x, int
         matrix_y = map_y - (master_grid_height/2 - height/2);
 }
 
-
 void DynamicLayer::matchSize()
 { 
     Costmap2D* master = layered_costmap_->getCostmap();
@@ -274,10 +263,45 @@ void DynamicLayer::matchSize()
             master->getOriginX(), master->getOriginY());
 }
 
-
-void DynamicLayer::reconfigureCB(costmap_2d::GenericPluginConfig &config, uint32_t level)
+void DynamicLayer::reconfigureCB(scitos_2d_navigation::dynamic_layer_paramsConfig &config, uint32_t level)
 {
+    if(debug) ROS_WARN("+++ Got new params from dynamic reconfigure");
+    
+    // enable/disable whole layer   
     enabled_ = config.enabled;
+    
+    // enable/disable print debug output
+    debug = config.debug_flag;
+    
+    // which maps to publish
+    publish_fine_map = config.publish_fine_map;
+    publish_block_map = config.publish_block_map;
+    publish_input_map = config.publish_input_map;
+    
+    // get and recalculate parameters of algorithm
+    stat_low = config.stat_low;
+    stat_Low = stat_low/(1-stat_low);
+    stat_low2 = config.stat_low2;
+    stat_Low2 = stat_low2/(1-stat_low2);
+    stat_high = config.stat_high;
+    stat_High = stat_high/(1-stat_high);
+    dyn_low = config.dyn_low;
+    dyn_Low = dyn_low/(1-dyn_low);
+    dyn_high = config.dyn_high;
+    dyn_High = dyn_high/(1-dyn_high);
+    
+    // define publisher and shut them down if needed xxxPub.shutdown() ???
+    if(publish_fine_map) {
+        staticMapPub = nh.advertise<nav_msgs::OccupancyGrid>("static_map", 10);
+        dynamicMapPub = nh.advertise<nav_msgs::OccupancyGrid>("dynamic_map", 10);
+    }
+    if(publish_block_map) {
+        staticMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("static_map_xxl", 10);
+        dynamicMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("dynamic_map_xxl", 10);
+    }
+    if(publish_input_map) {
+        inputMapPub = nh.advertise<nav_msgs::OccupancyGrid>("input_map", 10);
+    }
 }
 
 void DynamicLayer::updateBounds(double origin_x, double origin_y, double origin_yaw, double* min_x,
@@ -481,24 +505,34 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
             ROS_INFO_STREAM("width_xxl: " << width_xxl << " -- height_xxl: " << height_xxl << " -- width_xxl*height_xxl: " << width_xxl*height_xxl);
         
         mod_number = (int)(resolution_xxl / master_grid_resolution +0.5);            // good idea to introduce an exception handler here
-
-        // initialize matrices
-        if(publish_fine_map) {
-            staticMap_matrix = MatrixXf::Constant(width, height, 0.5);
-            dynamicMap_matrix = MatrixXf::Constant(width, height, 0.5);
-        }
-        if(publish_block_map) {
-            staticMap_xxl_matrix = MatrixXf::Constant(width_xxl, height_xxl, 0.5);
-            dynamicMap_xxl_matrix = MatrixXf::Constant(width_xxl, height_xxl, 0.5);
-        }
-    
         
         min_i = std::max(min_i, master_grid_width/2  - width/2);
         min_j = std::max(min_j, master_grid_height/2 - height/2);
         max_i = std::min(max_i, master_grid_width/2  + width/2);
         max_j = std::min(max_j, master_grid_height/2 + height/2);
     }
-
+    
+    // handle all init here
+    if(publish_fine_map && !flag_init_fine) {
+        initStaticMap();
+        initDynamicMap();
+        staticMap_matrix = MatrixXf::Constant(width, height, 0.5);
+        dynamicMap_matrix = MatrixXf::Constant(width, height, 0.5);
+        // do not set flag_init_fine to true because we may want to initialize it with the map
+    }
+    if(publish_block_map && !flag_init_block) {
+        initStaticMapXxl();
+        initDynamicMapXxl();
+        staticMap_xxl_matrix = MatrixXf::Constant(width_xxl, height_xxl, 0.5);
+        dynamicMap_xxl_matrix = MatrixXf::Constant(width_xxl, height_xxl, 0.5);
+        flag_init_block = true;
+    }
+    if(publish_input_map && !flag_init_input) {
+        initInputMap();
+        flag_init_input = true;
+    }
+    
+    
     if(debug) {
         ROS_INFO("------------updateCosts--");
         ROS_INFO("min_i:      %i", min_i);
@@ -517,9 +551,6 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
     costmap_2d::Costmap2D* layered_costmap = layered_costmap_->getCostmap();
     unsigned int size_x = layered_costmap->getSizeInCellsX(), size_y = layered_costmap->getSizeInCellsY();
     unsigned char* master_array = layered_costmap->getCharMap();
-    
-    //~ unsigned int array_index = 2196;
-    //~ unsigned char element = master_array[array_index];
 
     int counter_ma = 0;
     for (int j = min_j; j < max_j; j++) {
@@ -626,6 +657,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         
         // publish Maps
         if(publish_fine_map) {
+            if(debug) ROS_WARN("Right before pusblishing");
             publishMap(staticMap, staticMap_matrix, n_cells);
             publishMap(dynamicMap, dynamicMap_matrix, n_cells);
         }
@@ -636,60 +668,42 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         if(publish_input_map) {
             publishMap(inputMap, inputData_matrix, n_cells);
         }
-        // for debugging input
-        //~ publishMap(staticMap, inputData_matrix, n_cells);
-        //~ publishMap(staticMap_xxl, inputData_xxl_matrix, n_cells_xxl);
-            
-    } else {
+    }
         // initialize staticMap with the values of the static_layer
-        if(publish_fine_map) {
-            initStaticMap(); // create the map so it's available
-            for(int i=min_i; i<max_i; i++) {
-                for(int j=min_j; j<max_j; j++) {
-                    int index = layered_costmap->getIndex(i, j);
-                    transformMapToMatrix(i, j, matrix_x, matrix_y);
-                    //~ ROS_ERROR_STREAM("I was able to transform " << i << " " << j << " " << matrix_x << " " << matrix_y);
-                    if((int)master_array[index] == NO_INFORMATION) {
+    if(publish_fine_map && !flag_init_fine) {
+        for(int i=min_i; i<max_i; i++) {
+            for(int j=min_j; j<max_j; j++) {
+                int index = layered_costmap->getIndex(i, j);
+                transformMapToMatrix(i, j, matrix_x, matrix_y);
+                //~ ROS_ERROR_STREAM("I was able to transform " << i << " " << j << " " << matrix_x << " " << matrix_y);
+                if((int)master_array[index] == NO_INFORMATION) {
+                    staticMap_matrix(matrix_x, matrix_y) = 0.5;
+                    continue;
+                } else if((int)master_array[index] == FREE_SPACE) {
+                    if(init_fine_blank) {
                         staticMap_matrix(matrix_x, matrix_y) = 0.5;
-                        continue;
-                    } else if((int)master_array[index] == FREE_SPACE) {
-                        if(init_fine_blank) {
-                            staticMap_matrix(matrix_x, matrix_y) = 0.5;
-                        } else {
-                            staticMap_matrix(matrix_x, matrix_y) = map_min_value;
-                        }
-                        continue;
-                    } else if((int)master_array[index] == LETHAL_OBSTACLE) {
-                        if(init_fine_blank) {
-                            staticMap_matrix(matrix_x, matrix_y) = 0.5;
-                        } else {
-                            staticMap_matrix(matrix_x, matrix_y) = map_max_value;
-                        }
-                        continue;
                     } else {
-                        ROS_WARN("Cannot introduce ano unknown value to the map...");
+                        staticMap_matrix(matrix_x, matrix_y) = map_min_value;
                     }
+                    continue;
+                } else if((int)master_array[index] == LETHAL_OBSTACLE) {
+                    if(init_fine_blank) {
+                        staticMap_matrix(matrix_x, matrix_y) = 0.5;
+                    } else {
+                        staticMap_matrix(matrix_x, matrix_y) = map_max_value;
+                    }
+                    continue;
+                } else {
+                    ROS_WARN("Cannot introduce ano unknown value to the map...");
                 }
             }
-            
-            // initialize dynamicMap
-            initDynamicMap();
         }
-        
-        // only initialize if needed
-        if(publish_block_map) {
-            initStaticMapXxl();
-            initDynamicMapXxl();
-        }
-        
-        // init publishing raw input
-        if(publish_input_map) {
-            initInputMap();
-        }
-        
-        // only do that once
-        flag_init = true;
+        flag_init_fine = true;
     }
+        
+    // only do that once
+    flag_init = true;
+
     
 
     //~ planner_costmap_ros_->resetMapOutsideWindow(0,0);

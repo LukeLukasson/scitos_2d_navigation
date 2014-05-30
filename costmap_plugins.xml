@@ -5,7 +5,7 @@
         </class>
     </library>
     <library path="lib/liboverwrite_layer">
-        <class type="scitos_2d_navigation::OverwriteLayer" base_class_type="costmap_2d::CostmapLayer">
+        <class type="scitos_2d_navigation::OverwriteLayer" base_class_type="costmap_2d::Layer">
             <description>Overwriting the layered costmap with a user defined map.</description>
         </class>
     </library>

@@ -265,7 +265,7 @@ void DynamicLayer::matchSize()
 
 void DynamicLayer::reconfigureCB(scitos_2d_navigation::dynamic_layer_paramsConfig &config, uint32_t level)
 {
-    if(debug) ROS_WARN("+++ Got new params from dynamic reconfigure");
+    if(debug) ROS_INFO("Got params from dynamic reconfigure");
     
     // enable/disable whole layer   
     enabled_ = config.enabled;
@@ -292,15 +292,15 @@ void DynamicLayer::reconfigureCB(scitos_2d_navigation::dynamic_layer_paramsConfi
     
     // define publisher and shut them down if needed xxxPub.shutdown() ???
     if(publish_fine_map) {
-        staticMapPub = nh.advertise<nav_msgs::OccupancyGrid>("static_map", 10);
-        dynamicMapPub = nh.advertise<nav_msgs::OccupancyGrid>("dynamic_map", 10);
+        staticMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/static_map", 10);
+        dynamicMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/dynamic_map", 10);
     }
     if(publish_block_map) {
-        staticMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("static_map_xxl", 10);
-        dynamicMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("dynamic_map_xxl", 10);
+        staticMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/static_map_xxl", 10);
+        dynamicMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/dynamic_map_xxl", 10);
     }
     if(publish_input_map) {
-        inputMapPub = nh.advertise<nav_msgs::OccupancyGrid>("input_map", 10);
+        inputMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/input_map", 10);
     }
 }
 
@@ -516,6 +516,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
     if(publish_fine_map && !flag_init_fine) {
         initStaticMap();
         initDynamicMap();
+        ROS_INFO_STREAM("Initialized fine maps with " << width << " X " << height);
         staticMap_matrix = MatrixXf::Constant(width, height, 0.5);
         dynamicMap_matrix = MatrixXf::Constant(width, height, 0.5);
         // do not set flag_init_fine to true because we may want to initialize it with the map

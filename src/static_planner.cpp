@@ -19,16 +19,19 @@ protected:
     
     // callback for goal subscriber
     void goal_cb(const geometry_msgs::PoseStampedConstPtr &msg);
+    void static_map_cb(const nav_msgs::OccupancyGrid &static_map);
     
     // ROS handles
     ros::NodeHandle nh;
     ros::Rate *loop_rate;
     // Subscribers
     ros::Subscriber subGoal;
+    ros::Subscriber subStaticMap;
 
     // listen to tf
     tf::TransformListener transform;
     
+    // init
     costmap_2d::Costmap2DROS *costmap;
     navfn::NavfnROS navfn_plan;
     
@@ -42,6 +45,7 @@ static_planner_node::static_planner_node():
 {
     // subscribe to new goals
     subGoal = nh.subscribe("/move_base/current_goal", 2, &static_planner_node::goal_cb, this);
+    subStaticMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/static_map", 2, &static_planner_node::static_map_cb, this);
     
     // init the layered costmap
     costmap = new costmap_2d::Costmap2DROS("static_costmap", transform);
@@ -60,14 +64,14 @@ static_planner_node::~static_planner_node()
     
 void static_planner_node::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 {
-    ROS_INFO("Callback new goal");
+    ROS_WARN("+++ Callback new goal");
     
     while(ros::ok()) {
         
         // core of the planning algorithm
         geometry_msgs::PoseStamped tmsg;
 
-        transform.transformPose( "/map", *msg, tmsg );
+        transform.transformPose("/map", *msg, tmsg);
         geometry_msgs::PoseStamped start = tmsg, tstart;
         start.header.frame_id = "/base_link";
         start.pose.position.x = 0;
@@ -75,13 +79,12 @@ void static_planner_node::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
         start.pose.position.z = 0;
         transform.transformPose( "/map", start, tstart );
 
-        ROS_INFO( "plan(%s): (%f,%f) ==> (%f,%f)", tmsg.header.frame_id.c_str(), tstart.pose.position.x,tstart.pose.position.y,tmsg.pose.position.x,tmsg.pose.position.y );
+        ROS_INFO("plan(%s): (%f,%f) ==> (%f,%f)", tmsg.header.frame_id.c_str(), tstart.pose.position.x,tstart.pose.position.y,tmsg.pose.position.x,tmsg.pose.position.y);
 
 
-        bool planned = navfn_plan.makePlan( tstart, tmsg, path );
-        if( !planned )
-            {
-            ROS_WARN( "plan did not succeed" );
+        bool planned = navfn_plan.makePlan(tstart, tmsg, path);
+        if(!planned) {
+            ROS_WARN("plan did not succeed");
             }
         /*
         for( unsigned int i = 0; i < path.size(); i++ )
@@ -89,12 +92,18 @@ void static_planner_node::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
             ROS_INFO( "path(%d): (%f,%f)", i, path[i].pose.position.x, path[i].pose.position.y );
             }
         */
-        navfn_plan.publishPlan( path, 0.0, .8, 0.0, 0.2 );
+        navfn_plan.publishPlan(path, 0.0, .8, 0.0, 0.2);
         
         ros::spinOnce();    // important not to ignore any callbacks!
         loop_rate->sleep();
     }
-}
+};
+
+void static_planner_node::static_map_cb(const nav_msgs::OccupancyGrid &static_map)
+{
+    ROS_WARN("+++ Callback static map");
+    
+};
 
 
 int main( int argc, char* argv[] )

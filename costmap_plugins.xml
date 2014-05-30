@@ -3,5 +3,10 @@
         <class type="scitos_2d_navigation::DynamicLayer" base_class_type="costmap_2d::Layer">
             <description>Publishing a static_map and a dynamic_map based on old and current measurments.</description>
         </class>
-    </library>    
+    </library>
+    <library path="lib/liboverwrite_layer">
+        <class type="scitos_2d_navigation::OverwriteLayer" base_class_type="costmap_2d::CostmapLayer">
+            <description>Overwriting the layered costmap with a user defined map.</description>
+        </class>
+    </library>
 </class_libraries>

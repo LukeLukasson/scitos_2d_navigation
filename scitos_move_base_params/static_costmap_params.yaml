@@ -3,9 +3,11 @@
 update_frequency: 5.0
 static_map: true
 rolling_window: false
+always_send_full_costmap: true
+
 plugins:  
-#~ - {name: overwrite_layer, type: "scitos_2d_navigation::OverwriteLayer"}
-- {name: map_layer, type: "costmap_2d::StaticLayer"}
+- {name: overwrite_layer, type: "scitos_2d_navigation::OverwriteLayer"}
+#~ - {name: map_layer, type: "costmap_2d::StaticLayer"}
 #~ - {name: no_go_layer, type: "costmap_2d::StaticLayer"}
 #~ - {name: obstacle_layer, type: "costmap_2d::VoxelLayer"}
 #~ - {name: dynamic_layer, type: "scitos_2d_navigation::DynamicLayer"}
@@ -25,7 +27,8 @@ footprint: [[0.235, 0.31], [-0.515, 0.31], [-0.515, -0.31], [0.235, -0.31]]
 
 overwrite_layer:
   #~ map_topic: /map
-  map_topic: /map
+  map_topic: /move_base/global_costmap/dynamic_layer/static_map
+  use_maximum: false
 
 no_go_layer:
   map_topic: /no_go_map
@@ -53,30 +56,3 @@ obstacle_layer:
   
   track_unknown_space: true
   combination_method: 0
-
-
-dynamic_layer:
-    
-  #    low:      how fast shall we forget?
-  #    high:     how fast shall we believe
-  #    low2:     how fast shall we introduce a new object into the static map?
-    
-  stat_low: 0.3
-  stat_low2: 0.5001
-  stat_high: 0.6
-  dyn_low: 0.2
-  dyn_high: 0.999999
-    
-  # has to be n*0.05
-  # good results with 0.2 and 0.5
-  resolution_subsampling: 0.35
-    
-  # flags
-  debug_flag: false
-  init_static_map_blank: true
-  publish_fine_map: true
-  publish_block_map: false
-  publish_input_map: false
-   
-  max_cells_x: 800
-  max_cells_y: 800

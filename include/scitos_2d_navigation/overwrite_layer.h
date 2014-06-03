@@ -10,6 +10,8 @@
 #include <map_msgs/OccupancyGridUpdate.h>
 #include <message_filters/subscriber.h>
 #include <scitos_2d_navigation/overwrite_layer_paramsConfig.h>
+#include <costmap_2d/costmap_2d_publisher.h>
+
 
 namespace scitos_2d_navigation
 {
@@ -35,14 +37,11 @@ private:
 * map along with its size will determine what parts of the costmap's
 * static map are overwritten.
 */
-    void incomingMap(const nav_msgs::OccupancyGridConstPtr& new_map);
-    void incomingUpdate(const map_msgs::OccupancyGridUpdateConstPtr& update);
+    void incomingMap(const nav_msgs::OccupancyGrid& new_map);
     void reconfigureCB(scitos_2d_navigation::overwrite_layer_paramsConfig &config, uint32_t level);
-
     unsigned char interpretValue(unsigned char value);
 
     std::string global_frame_; ///< @brief The global frame for the costmap
-    bool subscribe_to_updates_;
     bool map_received_;
     bool has_updated_data_;
     unsigned int x_,y_,width_,height_;
@@ -50,11 +49,15 @@ private:
     bool use_maximum_;
     bool trinary_costmap_;
     ros::Subscriber map_sub_, map_update_sub_;
+    costmap_2d::Costmap2DPublisher *publisher;
 
     unsigned char lethal_threshold_, unknown_cost_value_;
 
     mutable boost::recursive_mutex lock_;
     dynamic_reconfigure::Server<scitos_2d_navigation::overwrite_layer_paramsConfig> *dsrv_;
+    
+    // need to access that globally
+    std::string map_topic;
 };
 }
 #endif

@@ -22,18 +22,23 @@ protected:
 
     // callback for goal subscriber
     void goal_cb(const geometry_msgs::PoseStampedConstPtr &msg);
-    void dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamic_map_in);
+    void dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn);
     
     // ROS handles
     ros::NodeHandle nh;
     ros::Rate *loop_rate;
     
-    // Subscribers
+    // subscribers
     ros::Subscriber subGoal;
     ros::Subscriber subDynamicMap;
     
+    // publisher
+    costmap_2d::Costmap2DPublisher *pubTableMap;
+    costmap_2d::Costmap2DPublisher *pubDynMap;
+    
     // maps
-    nav_msgs::OccupancyGrid dynamicMap;
+    costmap_2d::Costmap2D *tableMap;
+    costmap_2d::Costmap2D *dynMap;
     bool init_map;
     double map_width;
     double map_height;
@@ -76,9 +81,6 @@ static_planner_node::static_planner_node():
     // flags
     init_map = false;
     
-    // counters
-    cb_counter = 0;
-    
 };
 
 // destructor
@@ -110,7 +112,7 @@ void static_planner_node::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
         bool planned = navfn_plan.makePlan(tstart, tmsg, path);
         if(!planned) {
             ROS_WARN("plan did not succeed");
-            }
+        }
 
         navfn_plan.publishPlan(path, 0.0, .8, 0.0, 0.2);
         
@@ -122,27 +124,42 @@ void static_planner_node::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
     }
 };
 
-void static_planner_node::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamic_map_in)
+void static_planner_node::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
 {
 
     ROS_WARN("+++ Received dynamic map");
     
-    // copy process every time. Pointer would be better -> something for later...
-    // maybe dynamicMpa->resolution...
-    dynamicMap = dynamic_map_in;
-    cb_counter = 0;
-    
-    if(!init_map) {
-        map_width   = dynamicMap.info.height;
-        map_height  = dynamicMap.info.width;
-        map_origin_x= dynamicMap.info.origin.position.x;
-        map_origin_y= dynamicMap.info.origin.position.y;
-        map_res     = dynamicMap.info.resolution;
-        mod_num     = (int)(map_res/0.05 + 0.5); // UNSCHÖN! -> solve generically! (0.05 = master_map.resolution...)
+    if(!init_map) {        
+        map_height   = dynamicMapIn.info.height;
+        map_width    = dynamicMapIn.info.width;
+        map_origin_x = dynamicMapIn.info.origin.position.x;
+        map_origin_y = dynamicMapIn.info.origin.position.y;
+        map_res      = dynamicMapIn.info.resolution;
+        mod_num      = (int)(map_res/0.05 + 0.5); // UNSCHÖN! -> solve generically! (0.05 = master_map.resolution...)
+        
+        ROS_INFO_STREAM("width: " << map_width << " --- height: " << map_height);
         
         init_map = true;
+        
+        // just copy dynamicMap for visMap
+        tableMap = new costmap_2d::Costmap2D(map_width, map_height, map_res, map_origin_x, map_origin_y);
+        dynMap = new costmap_2d::Costmap2D(map_width, map_height, map_res, map_origin_x, map_origin_y);
+        
+        // publisher
+        pubTableMap = new costmap_2d::Costmap2DPublisher(&nh, tableMap, "/map", "/table_map", true);        
+        pubDynMap = new costmap_2d::Costmap2DPublisher(&nh, dynMap, "/map", "/dynamic_map_xxl_copy", true);        
+
     }
     
+    // incoming dynamic map to Costmap2D
+    for(int i=0; i<map_width; i++) {
+        for(int j=0; j<map_height; j++) {
+            dynMap->setCost(i, j, dynamicMapIn.data[dynMap->getIndex(i,j)]);
+        }
+    }
+    
+    pubTableMap->publishCostmap();
+    pubDynMap->publishCostmap();
 };
 
 void static_planner_node::check_path()
@@ -166,18 +183,13 @@ void static_planner_node::check_path()
             int j_xxl = map_y / map_res;
             
             // get value from map
-            int value_map = (int)dynamicMap.data[j_xxl*map_height + i_xxl];
+            int value_map = (int)dynMap->getCost(i_xxl, j_xxl);
             
-            //~ ROS_INFO_STREAM("width:  " << map_width << " res: " << map_res << " Number of cells: " << map_width*map_res << " " << map_width/map_res << " " << mod_num);
-            //~ ROS_INFO_STREAM("height: " << map_height << " res: " << map_res << " Number of cells: " << map_height*map_res << " " << map_height/map_res);
-            //~ 
-            //~ for(int j = 0; j < 60; j++) {
-                //~ ROS_WARN_STREAM("Data value at " << j << " is " << (int)dynamicMap.data[j]);
-            //~ }
-            //~ ROS_WARN_STREAM("Map: (" << map_x << ", " << map_y << ")  --  Square: (" << i_xxl << ", " << j_xxl << ")  --  Value: " << value_map);
-            
+            // check if there is a dynamic obstacle (maybe more conservative over 51?)
             if(value_map > 90) {
                 ROS_ERROR_STREAM("Obstacle at (" << map_x+map_origin_x << ", " << map_y+map_origin_y << ") -- Block: (" << i_xxl << ", " << j_xxl << ")  --  Value: " << value_map);
+                tableMap->setCost(i_xxl, j_xxl, 200);
+                pubTableMap->publishCostmap();
             }
         }
     }

@@ -1,65 +1,4 @@
-#include <ros/ros.h>
-
-#include <tf/transform_listener.h>
-#include <costmap_2d/costmap_2d_ros.h>
-#include <navfn/navfn_ros.h>
-
-#include <geometry_msgs/PoseStamped.h>
-
-// class header
-class static_planner_node
-{
-public:
-    
-    // constructor, destructor
-    static_planner_node();
-    ~static_planner_node();
-    
-    // public check for occupied path
-    void check_path(); // needs tons of exception handles!!!
-    
-protected:
-
-    // callback for goal subscriber
-    void goal_cb(const geometry_msgs::PoseStampedConstPtr &msg);
-    void dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn);
-    
-    // ROS handles
-    ros::NodeHandle nh;
-    ros::Rate *loop_rate;
-    
-    // subscribers
-    ros::Subscriber subGoal;
-    ros::Subscriber subDynamicMap;
-    
-    // publisher
-    costmap_2d::Costmap2DPublisher *pubTableMap;
-    costmap_2d::Costmap2DPublisher *pubDynMap;
-    
-    // maps
-    costmap_2d::Costmap2D *tableMap;
-    costmap_2d::Costmap2D *dynMap;
-    bool init_map;
-    double map_width;
-    double map_height;
-    double map_origin_x;
-    double map_origin_y;
-    double map_res;
-    int mod_num;
-    
-    // listen to tf
-    tf::TransformListener transform;
-    
-    // init
-    costmap_2d::Costmap2DROS *costmap;
-    navfn::NavfnROS navfn_plan;
-    
-    // make path available globally
-    std::vector<geometry_msgs::PoseStamped> path;
-    
-    // counters
-    int cb_counter;
-};
+#include <scitos_2d_navigation/static_planner.h>
 
 // constructor
 static_planner_node::static_planner_node():
@@ -67,10 +6,54 @@ static_planner_node::static_planner_node():
 {
     ROS_WARN("Initialize node");
     
-    // subscribe to new goals
-    subGoal = nh.subscribe("/move_base/current_goal", 2, &static_planner_node::goal_cb, this);
-    subDynamicMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/dynamic_map_xxl", 2, &static_planner_node::dynamic_map_cb, this);
+    // flags
+    init_map = false;    
     
+    // handles the datacentre connection
+    ROS_INFO("Here fine");
+    ros_datacentre::MessageStoreProxy messageStore(nh);
+    
+    ROS_INFO("Here fine");
+    strands_perception_msgs::Table my_table;
+    my_table.table_id = "MagicTable1";
+    my_table.header.frame_id = "/map";
+    
+    my_table.pose.pose.position.x = 0;
+    my_table.pose.pose.position.y = 0;
+    my_table.pose.pose.position.z = 0;
+    
+    my_table.pose.pose.orientation.x = 0;
+    my_table.pose.pose.orientation.y = 0;
+    my_table.pose.pose.orientation.z = 0;
+    my_table.pose.pose.orientation.w = 1;
+    
+    ROS_INFO("Here fine");
+    // adding 4 points
+    my_table.tabletop.points.resize(4);
+
+    my_table.tabletop.points[0].x = 0;
+    my_table.tabletop.points[0].y = 0;
+    my_table.tabletop.points[0].z = 0;
+    
+    my_table.tabletop.points[1].x = 1;
+    my_table.tabletop.points[1].y = 0;
+    my_table.tabletop.points[1].z = 0;
+    
+    my_table.tabletop.points[2].x = 1;
+    my_table.tabletop.points[2].y = 1;
+    my_table.tabletop.points[2].z = 0;
+    
+    my_table.tabletop.points[3].x = 0;
+    my_table.tabletop.points[3].y = 1;
+    my_table.tabletop.points[3].z = 0;
+
+    ROS_INFO("Here fine");
+    std::string id(messageStore.insertNamed("MagicTable", my_table));
+    ROS_INFO_STREAM("Table with id " << id << " inserted.");
+    
+    
+        
+ 
     // init the layered costmap
     costmap = new costmap_2d::Costmap2DROS("static_costmap", transform);
     
@@ -78,9 +61,12 @@ static_planner_node::static_planner_node():
     navfn_plan.initialize("static_planner", costmap);
     loop_rate = new ros::Rate(5.0);
     
-    // flags
-    init_map = false;
+
+    ROS_INFO("Finished init");
     
+    // subscribe to new goals (must be in the very end -> otherwise can jump out of init)
+    subGoal = nh.subscribe("/move_base/current_goal", 2, &static_planner_node::goal_cb, this);
+    subDynamicMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/dynamic_map_xxl", 2, &static_planner_node::dynamic_map_cb, this);
 };
 
 // destructor

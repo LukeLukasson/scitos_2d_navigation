@@ -1,10 +1,22 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(scitos_2d_navigation)
 
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED roscpp rospy sensor_msgs std_msgs pcl_ros tf costmap_2d dynamic_reconfigure navfn)
+find_package(catkin REQUIRED COMPONENTS
+                    roscpp
+                    rospy
+                    sensor_msgs
+                    std_msgs pcl_ros
+                    tf
+                    costmap_2d
+                    dynamic_reconfigure
+                    navfn
+                    strands_perception_msgs
+                    ros_datacentre_cpp_client
+)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -12,7 +24,7 @@ find_package(catkin REQUIRED roscpp rospy sensor_msgs std_msgs pcl_ros tf costma
 find_package(PCL REQUIRED)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
-add_definitions(${PCL_DEFINITIONS})
+add_definitions(${PCL_DEFINITIONS} -std=c++0x)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -44,10 +56,11 @@ generate_dynamic_reconfigure_options(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+#~ generate_messages(
+    #~ DEPENDENCIES
+    #~ std_msgs  # Or other packages containing msgs
+    #~ strands_perception_msgs
+#~ )
 
 ###################################
 ## catkin specific configuration ##
@@ -59,7 +72,7 @@ generate_dynamic_reconfigure_options(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES dynamic_layer overwrite_layer
+  LIBRARIES dynamic_layer overwrite_layer static_planner
   CATKIN_DEPENDS costmap_2d dynamic_reconfigure roscpp
   DEPENDS system_lib
 )
@@ -95,8 +108,8 @@ add_dependencies(dynamic_layer plugins/dynamic_layer.cpp)
 add_dependencies(dynamic_layer dynamic_layer_gencfg) # please do not ask me why... black magic maybe?
 add_dependencies(overwrite_layer plugins/overwrite_layer.cpp)
 add_dependencies(overwrite_layer overwrite_layer_gencfg) # please do not ask me why... black magic maybe?
-
-
+add_dependencies(static_planner src/static_planner.cpp)
+add_dependencies(static_planner strands_perception_msgs_generate_messages_cpp)
 
 target_link_libraries(noise_approximate_voxel_grid
   ${PCL_LIBRARIES}

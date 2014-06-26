@@ -9,4 +9,9 @@
             <description>Overwriting the layered costmap with a user defined map.</description>
         </class>
     </library>
+    <library path="lib/libsmart_obstacle_layer">
+        <class type="scitos_2d_navigation::SmartObstacleLayer" base_class_type="costmap_2d::Layer">
+            <description>Determines which pixels were updated in contrast to just a rectangular shape.</description>
+        </class>
+    </library>
 </class_libraries>

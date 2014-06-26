@@ -12,6 +12,8 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <scitos_2d_navigation/dynamic_layer_paramsConfig.h>    // dynamic reconfigure header
 
+#include <costmap_2d/obstacle_layer.h>
+
 namespace scitos_2d_navigation
 {
     

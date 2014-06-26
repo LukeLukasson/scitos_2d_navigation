@@ -35,6 +35,7 @@ add_definitions(${PCL_DEFINITIONS} -std=c++0x)
 generate_dynamic_reconfigure_options(
   cfg/dynamic_layer_params.cfg
   cfg/overwrite_layer_params.cfg
+  cfg/smart_obstacle_layer_params.cfg
 )
 
 #######################################
@@ -72,7 +73,7 @@ generate_dynamic_reconfigure_options(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES dynamic_layer overwrite_layer static_planner
+  LIBRARIES dynamic_layer overwrite_layer smart_obstacle_layer static_planner 
   CATKIN_DEPENDS costmap_2d dynamic_reconfigure roscpp
   DEPENDS system_lib
 )
@@ -94,6 +95,7 @@ include_directories(
 add_library(noise_approximate_voxel_grid src/noise_approximate_voxel_grid.cpp)
 add_library(dynamic_layer plugins/dynamic_layer.cpp)
 add_library(overwrite_layer plugins/overwrite_layer.cpp)
+add_library(smart_obstacle_layer plugins/smart_obstacle_layer.cpp)
 
 ## Declare a cpp executable
 add_executable(subsample_cloud src/subsample_cloud.cpp)
@@ -108,6 +110,8 @@ add_dependencies(dynamic_layer plugins/dynamic_layer.cpp)
 add_dependencies(dynamic_layer dynamic_layer_gencfg) # please do not ask me why... black magic maybe?
 add_dependencies(overwrite_layer plugins/overwrite_layer.cpp)
 add_dependencies(overwrite_layer overwrite_layer_gencfg) # please do not ask me why... black magic maybe?
+add_dependencies(smart_obstacle_layer plugins/smart_obstacle_layer.cpp)
+add_dependencies(smart_obstacle_layer smart_obstacle_layer_gencfg) # please do not ask me why... black magic maybe?
 add_dependencies(static_planner src/static_planner.cpp)
 add_dependencies(static_planner strands_perception_msgs_generate_messages_cpp)
 

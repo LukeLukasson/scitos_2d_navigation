@@ -382,85 +382,86 @@ void DynamicLayer::updateMaps(Eigen::MatrixXf &meas_mat, const int min_x, const 
     
     for(int i=min_x; i<max_x; i++) {
         for(int j=min_y; j<max_y; j++) {
-            // map input data to probabilistic representation
-            if(meas_mat(i,j) == LETHAL_OBSTACLE) {
-                meas_mat(i,j) = 1;
-            } else if(meas_mat(i,j) == NO_INFORMATION) {
-                meas_mat(i,j) = 0.5;
-            }
-            
-            // handle different input
-            if(xxl) {
-                stat_map_value = staticMap_xxl_matrix(i,j);
-            } else {
-                stat_map_value = staticMap_matrix(i,j);
-            }
-            
-            //~ // calcluate average (for stat) to decide whether its L or H
-            //~ avg = (meas_mat(i,j) + stat_map_value) / 2;
-            // calcluate diff (for dyn) to decide whether its L or H
-            diff = stat_map_value - meas_mat(i,j);
-            
-            // apply static model
-            if(diff > 0) {
-                model = stat_Low;
-            } else {
-                model = stat_High;
-                if(diff < -0.5) {        // second criteria for becoming L2
-                    model = stat_Low2;
-                }
-            }
-            
-            // never fully believe old static measurements
-            old_map = (stat_map_value) / (1 - stat_map_value);
-                        
-            // finally calculate p( S^t | o^1, ... , o^t, S^(t-1) )
-            if(meas_mat(i,j) == 0.5) {
-                if(xxl) {
-                    staticMap_xxl_matrix(i,j) = 0.5;
-                } else {
-                    staticMap_matrix(i,j) = 0.5;        // SUPER HACK!!! CHECK IF THAT IS A GOOD IDEA!!!
-                }
-            } else {
-                if(xxl) {
-                    staticMap_xxl_matrix(i,j) = std::min(map_max_value, std::max(map_min_value, (model*old_map) / (1 + model*old_map)));
-                    stat_map_value_upd = staticMap_xxl_matrix(i,j);
-                } else {
-                    staticMap_matrix(i,j) = std::min(map_max_value, std::max(map_min_value, (model*old_map) / (1 + model*old_map)));
-                    stat_map_value_upd = staticMap_matrix(i,j);
-                }
-            }
-            
-            // calcluate diff (for dyn) to decide whether its L or H (freshly... check that if necessary!) SUPER HACK
-            //~ diff = stat_map_value_upd - meas_mat(i,j);
-            
-            // apply dynamic model
-            if(diff < -upper_bound) {
-                model = dyn_High;
-            } else {
-                model = dyn_Low;
-            }
-            
-            if(xxl) {
-                // never fully believe old dynamic measurements
-                old_map = (dynamicMap_xxl_matrix(i,j)) / (1 - dynamicMap_xxl_matrix(i,j));
+            // only look at actual measurements!
+            if(meas_mat(i,j) != NO_INFORMATION) {
                 
-                // finally calculate p( D^t | o^1, ... , o^t, S^(t-1) )
-                dynamicMap_xxl_matrix(i,j) = std::min(map_max_value, std::max(map_min_value, (model*old_map) / (1 + model*old_map)));
-                //~ if(debug)
-                    //~ ROS_INFO("Finished updating xxl maps");
-            } else {
-                // never fully believe old dynamic measurements
-                old_map = (dynamicMap_matrix(i,j)) / (1 - dynamicMap_matrix(i,j));
+                // map input data to probabilistic representation
+                if(meas_mat(i,j) == LETHAL_OBSTACLE) {
+                    meas_mat(i,j) = 1;
+                }
                 
-                // finally calculate p( D^t | o^1, ... , o^t, S^(t-1) )
-                dynamicMap_matrix(i,j) = std::min(map_max_value, std::max(map_min_value, (model*old_map) / (1 + model*old_map)));
+                // handle different input
+                if(xxl) {
+                    stat_map_value = staticMap_xxl_matrix(i,j);
+                } else {
+                    stat_map_value = staticMap_matrix(i,j);
+                }
+                
+                //~ // calcluate average (for stat) to decide whether its L or H
+                //~ avg = (meas_mat(i,j) + stat_map_value) / 2;
+                // calcluate diff (for dyn) to decide whether its L or H
+                diff = stat_map_value - meas_mat(i,j);
+                
+                // apply static model
+                if(diff > 0) {
+                    model = stat_Low;
+                } else {
+                    model = stat_High;
+                    if(diff < -0.5) {        // second criteria for becoming L2
+                        model = stat_Low2;
+                    }
+                }
+                
+                // never fully believe old static measurements
+                old_map = (stat_map_value) / (1 - stat_map_value);
+                            
+                // finally calculate p( S^t | o^1, ... , o^t, S^(t-1) )
+                if(meas_mat(i,j) == 0.5) {
+                    if(xxl) {
+                        staticMap_xxl_matrix(i,j) = 0.5;
+                    } else {
+                        staticMap_matrix(i,j) = 0.5;        // SUPER HACK!!! CHECK IF THAT IS A GOOD IDEA!!!
+                    }
+                } else {
+                    if(xxl) {
+                        staticMap_xxl_matrix(i,j) = std::min(map_max_value, std::max(map_min_value, (model*old_map) / (1 + model*old_map)));
+                        stat_map_value_upd = staticMap_xxl_matrix(i,j);
+                    } else {
+                        staticMap_matrix(i,j) = std::min(map_max_value, std::max(map_min_value, (model*old_map) / (1 + model*old_map)));
+                        stat_map_value_upd = staticMap_matrix(i,j);
+                    }
+                }
+                
+                // calcluate diff (for dyn) to decide whether its L or H (freshly... check that if necessary!) SUPER HACK
+                //~ diff = stat_map_value_upd - meas_mat(i,j);
+                
+                // apply dynamic model
+                if(diff < -upper_bound) {
+                    model = dyn_High;
+                } else {
+                    model = dyn_Low;
+                }
+                
+                if(xxl) {
+                    // never fully believe old dynamic measurements
+                    old_map = (dynamicMap_xxl_matrix(i,j)) / (1 - dynamicMap_xxl_matrix(i,j));
+                    
+                    // finally calculate p( D^t | o^1, ... , o^t, S^(t-1) )
+                    dynamicMap_xxl_matrix(i,j) = std::min(map_max_value, std::max(map_min_value, (model*old_map) / (1 + model*old_map)));
+                    //~ if(debug)
+                        //~ ROS_INFO("Finished updating xxl maps");
+                } else {
+                    // never fully believe old dynamic measurements
+                    old_map = (dynamicMap_matrix(i,j)) / (1 - dynamicMap_matrix(i,j));
+                    
+                    // finally calculate p( D^t | o^1, ... , o^t, S^(t-1) )
+                    dynamicMap_matrix(i,j) = std::min(map_max_value, std::max(map_min_value, (model*old_map) / (1 + model*old_map)));
+                }
+                
+                if(debug) {
+                //~ std::cout << "|" << meas_mat(i,j) << ">" << old_dynamicMap_matrix_value << ">" << diff << ">" << model << ">" << old_map << ">" << dynamicMap_matrix(i,j) << " ";
+                }
             }
-            
-            if(debug) {
-            //~ std::cout << "|" << meas_mat(i,j) << ">" << old_dynamicMap_matrix_value << ">" << diff << ">" << model << ">" << old_map << ">" << dynamicMap_matrix(i,j) << " ";
-            }
-            
         }
     }
 }
@@ -532,8 +533,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         initInputMap();
         flag_init_input = true;
     }
-    
-    
+        
     if(debug) {
         ROS_INFO("------------updateCosts--");
         ROS_INFO("min_i:      %i", min_i);
@@ -548,76 +548,159 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
     // initialize input data matrix (only in scope to protect from misbehaving...)
     MatrixXf inputData_matrix = MatrixXf::Constant(width,height,-1);
     MatrixXf inputData_xxl_matrix = MatrixXf::Constant(width_xxl,height_xxl,-1);
-
-    costmap_2d::Costmap2D* layered_costmap = layered_costmap_->getCostmap();
-    unsigned int size_x = layered_costmap->getSizeInCellsX(), size_y = layered_costmap->getSizeInCellsY();
-    unsigned char* master_array = layered_costmap->getCharMap();
-
-    int counter_ma = 0;
-    for (int j = min_j; j < max_j; j++) {
-        for (int i = min_i; i < max_i; i++) {
-            int index_ma = layered_costmap->getIndex(i, j);
-            counter_ma++;
-        }
-    }
+        
+    //~ costmap_2d::Costmap2D* layered_costmap = layered_costmap_->getCostmap();
+    //~ unsigned int size_x = layered_costmap->getSizeInCellsX(), size_y = layered_costmap->getSizeInCellsY();
+    //~ unsigned char* master_array = layered_costmap->getCharMap();
+//~ 
+    //~ int counter_ma = 0;
+    //~ for (int j = min_j; j < max_j; j++) {
+        //~ for (int i = min_i; i < max_i; i++) {
+            //~ int index_ma = layered_costmap->getIndex(i, j);
+            //~ counter_ma++;
+        //~ }
+    //~ }
     
     if(debug) ROS_INFO_STREAM("Modnumber: " << mod_number);
 
     int matrix_x, matrix_y, i_xxl, j_xxl, mat_x_xxl, mat_y_xxl;
-    int counter = 0;
+    //~ int counter = 0;
     bool obstacle_present;
     bool unknown_present;
     float local_sum;
-    for (int j = min_j; j < max_j; j++)
-    {
-        for (int i = min_i; i < max_i; i++)
-        {
-            counter++;
-            int index = layered_costmap->getIndex(i, j);
-            transformMapToMatrix(i, j, matrix_x, matrix_y);
-            if(flag_init) {
-                inputData_matrix(matrix_x,matrix_y) = (int)master_array[index];
-                
-                // sample the inputData matrix algorithm
-                if(i%mod_number == (mod_number-1) && j%mod_number == (mod_number-1)) {            // last element
-                    transformMapToMatrix(i, j, mat_x_xxl, mat_y_xxl);
-                    i_xxl = mat_x_xxl/mod_number; j_xxl = mat_y_xxl/mod_number;
-                    
+    //~ for (int j = min_j; j < max_j; j++)
+    //~ {
+        //~ for (int i = min_i; i < max_i; i++)
+        //~ {
+            //~ counter++;
+            //~ int index = layered_costmap->getIndex(i, j);
+            //~ transformMapToMatrix(i, j, matrix_x, matrix_y);
+            //~ if(flag_init) {
+                //~ inputData_matrix(matrix_x,matrix_y) = (int)master_array[index];
+                //~ 
+                //~ // sample the inputData matrix algorithm
+                //~ if(i%mod_number == (mod_number-1) && j%mod_number == (mod_number-1)) {            // last element
+                    //~ transformMapToMatrix(i, j, mat_x_xxl, mat_y_xxl);
+                    //~ i_xxl = mat_x_xxl/mod_number; j_xxl = mat_y_xxl/mod_number;
+                    //~ 
                     //~ if(debug)
                     //~ ROS_WARN_STREAM("(i_xxl, j_xxl) = (" << i_xxl << ", " << j_xxl << ")");
+                    //~ 
+                    //~ // find the max of the lower resolution grid
+                    //~ obstacle_present = false;
+                    //~ unknown_present = false;
+                    //~ local_sum = 0;
+                    //~ for(int i_tmp=0; i_tmp<mod_number; i_tmp++) {
+                        //~ for(int j_tmp=0; j_tmp<mod_number; j_tmp++) {
+                            //~ // overrules everything
+                            //~ if(inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp) == LETHAL_OBSTACLE) {
+                                //~ obstacle_present = true;
+                            //~ }
+                            //~ // second priority
+                            //~ if(inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp) == NO_INFORMATION) {
+                                //~ unknown_present = true;
+                            //~ }
+                            //~ // else
+                            //~ local_sum += inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp);
+                        //~ }
+                    //~ }
+                    //~ 
+                    //~ if(obstacle_present) {
+                        //~ inputData_xxl_matrix(i_xxl,j_xxl) = LETHAL_OBSTACLE;
+                    //~ } else if(unknown_present) {
+                        //~ inputData_xxl_matrix(i_xxl,j_xxl) = NO_INFORMATION;
+                    //~ } else {
+                        //~ inputData_xxl_matrix(i_xxl,j_xxl) = local_sum/(mod_number*mod_number);
+                    //~ }
+                //~ }            
+            //~ }
+            //~ 
+//~ 
+        //~ }
+    //~ }
+    
+      
+    // search through all layers of the layered_costmap_
+    std::string search_string_1 = "smart_obstacle";
+    std::string search_string_2 = "obstacle";
+    
+    std::vector<boost::shared_ptr<costmap_2d::Layer> >* plugins = layered_costmap_->getPlugins();
+    for (std::vector<boost::shared_ptr<costmap_2d::Layer> >::iterator pluginp = plugins->begin(); pluginp != plugins->end(); ++pluginp) {
+        boost::shared_ptr<costmap_2d::Layer> plugin = *pluginp;
+        if((plugin->getName().find(search_string_1) != std::string::npos) || (plugin->getName().find(search_string_2) != std::string::npos)) {
+            boost::shared_ptr<costmap_2d::ObstacleLayer> costmap;
+            costmap = boost::static_pointer_cast<costmap_2d::ObstacleLayer>(plugin);
+            unsigned char* grid = costmap->getCharMap();
+            
+            for (int i = 0; i < master_grid_width; i++) {
+                for (int j = 0; j < master_grid_height; j++) {
                     
-                    // find the max of the lower resolution grid
-                    obstacle_present = false;
-                    unknown_present = false;
-                    local_sum = 0;
-                    for(int i_tmp=0; i_tmp<mod_number; i_tmp++) {
-                        for(int j_tmp=0; j_tmp<mod_number; j_tmp++) {
-                            // overrules everything
-                            if(inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp) == LETHAL_OBSTACLE) {
-                                obstacle_present = true;
+                    int index = costmap->getIndex(i, j);
+                    transformMapToMatrix(i, j, matrix_x, matrix_y);
+                    
+                    if(flag_init) {
+                        inputData_matrix(matrix_x,matrix_y) = (int)grid[index];
+                        
+                        // sample the inputData matrix algorithm
+                        if(i%mod_number == (mod_number-1) && j%mod_number == (mod_number-1)) {            // last element
+                            transformMapToMatrix(i, j, mat_x_xxl, mat_y_xxl);
+                            i_xxl = mat_x_xxl/mod_number; j_xxl = mat_y_xxl/mod_number;
+                            
+                            //~ if(debug)
+                            //~ ROS_WARN_STREAM("(i_xxl, j_xxl) = (" << i_xxl << ", " << j_xxl << ")");
+                            
+                            // find the max of the lower resolution grid
+                            obstacle_present = false;
+                            unknown_present = false;
+                            local_sum = 0;
+                            for(int i_tmp=0; i_tmp<mod_number; i_tmp++) {
+                                for(int j_tmp=0; j_tmp<mod_number; j_tmp++) {
+                                    // overrules everything
+                                    if(inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp) == LETHAL_OBSTACLE) {
+                                        obstacle_present = true;
+                                    }
+                                    // second priority
+                                    if(inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp) == NO_INFORMATION) {
+                                        unknown_present = true;
+                                    }
+                                    // else
+                                    local_sum += inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp);
+                                }
                             }
-                            // second priority
-                            if(inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp) == NO_INFORMATION) {
-                                unknown_present = true;
+                            
+                            if(obstacle_present) {
+                                inputData_xxl_matrix(i_xxl,j_xxl) = LETHAL_OBSTACLE;
+                            } else if(unknown_present) {
+                                inputData_xxl_matrix(i_xxl,j_xxl) = NO_INFORMATION;
+                            } else {
+                                inputData_xxl_matrix(i_xxl,j_xxl) = local_sum/(mod_number*mod_number);
                             }
-                            // else
-                            local_sum += inputData_matrix(mat_x_xxl-i_tmp,mat_y_xxl-j_tmp);
-                        }
+                        }            
                     }
                     
-                    if(obstacle_present) {
-                        inputData_xxl_matrix(i_xxl,j_xxl) = LETHAL_OBSTACLE;
-                    } else if(unknown_present) {
-                        inputData_xxl_matrix(i_xxl,j_xxl) = NO_INFORMATION;
-                    } else {
-                        inputData_xxl_matrix(i_xxl,j_xxl) = local_sum/(mod_number*mod_number);
-                    }
-                }            
+                    
+                    
+                    
+                    //~ int index = layered_costmap->getIndex(i, j);
+                    //~ transformMapToMatrix(i, j, matrix_x, matrix_y);
+                    //~ if(flag_init) {
+                        //~ inputData_matrix(matrix_x, matrix_y) = (int)grid[index];
+                    //~ }
+                }
             }
             
-
+            // which one is which -> color cell (2,3) -> works (index starts with (0,0)
+            if(debug) {
+                int index = costmap->getIndex(2, 3); // (i, j)
+                transformMapToMatrix(2, 3, matrix_x, matrix_y);
+                if(flag_init) {
+                    inputData_matrix(matrix_x, matrix_y) = 1.0;
+                }
+            }
+            
         }
-    }
+    }      
+    
         
     if(flag_init) {
         if(debug) ROS_INFO("I handled first input correctly and also initalized successfully.");
@@ -670,24 +753,29 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
             publishMap(inputMap, inputData_matrix, n_cells);
         }
     }
-        // initialize staticMap with the values of the static_layer
+    
+    // initialize staticMap with the values of the static_layer
+    
+    costmap_2d::Costmap2D* layered_costmap = layered_costmap_->getCostmap();
+    unsigned char* init_map_array = layered_costmap->getCharMap();
+    
     if(publish_fine_map && !flag_init_fine) {
         for(int i=min_i; i<max_i; i++) {
             for(int j=min_j; j<max_j; j++) {
                 int index = layered_costmap->getIndex(i, j);
                 transformMapToMatrix(i, j, matrix_x, matrix_y);
                 //~ ROS_ERROR_STREAM("I was able to transform " << i << " " << j << " " << matrix_x << " " << matrix_y);
-                if((int)master_array[index] == NO_INFORMATION) {
+                if((int)init_map_array[index] == NO_INFORMATION) {
                     staticMap_matrix(matrix_x, matrix_y) = 0.5;
                     continue;
-                } else if((int)master_array[index] == FREE_SPACE) {
+                } else if((int)init_map_array[index] == FREE_SPACE) {
                     if(init_fine_blank) {
                         staticMap_matrix(matrix_x, matrix_y) = 0.5;
                     } else {
                         staticMap_matrix(matrix_x, matrix_y) = map_min_value;
                     }
                     continue;
-                } else if((int)master_array[index] == LETHAL_OBSTACLE) {
+                } else if((int)init_map_array[index] == LETHAL_OBSTACLE) {
                     if(init_fine_blank) {
                         staticMap_matrix(matrix_x, matrix_y) = 0.5;
                     } else {
@@ -705,13 +793,6 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
     // only do that once
     flag_init = true;
 
-    
-
-    //~ planner_costmap_ros_->resetMapOutsideWindow(0,0);
-    //~ controller_costmap_ros_->resetMapOutsideWindow(0,0);
-    //~ layered_costmap_->setCost(3, 3, LETHAL_OBSTACLE); // does not do anything... ???
-    if(debug)
-        ROS_INFO_STREAM("Counter: " << counter << " NO_INFO means: " << (int)NO_INFORMATION);
 }
 
 } // end namespace

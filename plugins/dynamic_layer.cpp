@@ -210,14 +210,15 @@ void DynamicLayer::initInputMap()
 // push values of matrix to OccupancyGrid of map
 void DynamicLayer::publishMap(nav_msgs::OccupancyGrid &map, Eigen::MatrixXf &matrix, int cells)
 {
+   
     // how many cells in map? -> n_cells
     // cast <float> matrix to <int> matrix
-    MatrixXf matrix_copy = 100*matrix;
-    MatrixXi matrix_int = matrix_copy.cast<int>();
-
+    //~ MatrixXf matrix_copy = 100*matrix;    
+    MatrixXi matrix_int = (matrix*100).cast<int>();
+    
     // transform Eigen::Matrix to Eigen::Vector
     VectorXi vector_int = VectorXi::Map(matrix_int.data(), cells);
-        
+    
     // create vector to publish map
     int init_v[cells];
     std::vector<signed char> map_vector(init_v, init_v+cells);
@@ -506,7 +507,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
             ROS_INFO_STREAM("width_xxl: " << width_xxl << " -- height_xxl: " << height_xxl << " -- width_xxl*height_xxl: " << width_xxl*height_xxl);
         
         mod_number = (int)(resolution_xxl / master_grid_resolution +0.5);            // good idea to introduce an exception handler here
-        
+                
         min_i = std::max(min_i, master_grid_width/2  - width/2);
         min_j = std::max(min_j, master_grid_height/2 - height/2);
         max_i = std::min(max_i, master_grid_width/2  + width/2);
@@ -561,7 +562,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         //~ }
     //~ }
     
-    if(debug) ROS_INFO_STREAM("Modnumber: " << mod_number);
+    if(debug) ROS_INFO_STREAM("Modnumber: " << mod_number << " ");
 
     int matrix_x, matrix_y, i_xxl, j_xxl, mat_x_xxl, mat_y_xxl;
     //~ int counter = 0;
@@ -632,13 +633,16 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
             costmap = boost::static_pointer_cast<costmap_2d::ObstacleLayer>(plugin);
             unsigned char* grid = costmap->getCharMap();
             
-            for (int i = 0; i < master_grid_width; i++) {
-                for (int j = 0; j < master_grid_height; j++) {
-                    
+            if(debug) ROS_INFO_STREAM("Got costmap - w x h: " << width << " x " << height);
+            
+            for (int i = 0; i < width; i++) {
+                for (int j = 0; j < height; j++) {                    
+                
                     int index = costmap->getIndex(i, j);
                     transformMapToMatrix(i, j, matrix_x, matrix_y);
                     
                     if(flag_init) {
+                                                
                         inputData_matrix(matrix_x,matrix_y) = (int)grid[index];
                         
                         // sample the inputData matrix algorithm
@@ -677,18 +681,9 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
                             }
                         }            
                     }
-                    
-                    
-                    
-                    
-                    //~ int index = layered_costmap->getIndex(i, j);
-                    //~ transformMapToMatrix(i, j, matrix_x, matrix_y);
-                    //~ if(flag_init) {
-                        //~ inputData_matrix(matrix_x, matrix_y) = (int)grid[index];
-                    //~ }
                 }
             }
-            
+                        
             // which one is which -> color cell (2,3) -> works (index starts with (0,0)
             if(debug) {
                 int index = costmap->getIndex(2, 3); // (i, j)
@@ -741,9 +736,10 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         
         // publish Maps
         if(publish_fine_map) {
-            if(debug) ROS_WARN("Right before pusblishing");
+            if(debug) ROS_WARN("Right before publishing");
             publishMap(staticMap, staticMap_matrix, n_cells);
             publishMap(dynamicMap, dynamicMap_matrix, n_cells);
+            if(debug) ROS_WARN("Right after publishing");
         }
         if(publish_block_map) {
             publishMap(staticMap_xxl, staticMap_xxl_matrix, n_cells_xxl);

@@ -482,8 +482,11 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         master_grid_origin_y = master_grid.getOriginY();
         master_grid_resolution = master_grid.getResolution();
         master_grid_orientation = 1.0;
+        master_grid_width_m = master_grid.getSizeInMetersX();
+        master_grid_height_m = master_grid.getSizeInMetersY();
         if(debug) {
-            ROS_WARN_STREAM("+++ map dimensions of master_grid: " << master_grid_width << " x " << master_grid_height);
+            ROS_WARN_STREAM("+++ map dimensions of master_grid (px): " << master_grid_width << " x " << master_grid_height);
+            ROS_WARN_STREAM("+++ map dimensions of master_grid (m): " << master_grid_width_m << " x " << master_grid_height_m);
             ROS_WARN_STREAM("+++ map origin [m]: (" << master_grid_origin_x << ", " << master_grid_origin_y << ")");
             ROS_WARN_STREAM("+++ map resolution: " << master_grid_resolution);
         }

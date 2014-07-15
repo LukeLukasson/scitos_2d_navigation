@@ -115,8 +115,8 @@ void DynamicLayer::initStaticMap()
     staticMap.info.resolution = master_grid_resolution;                                                                 // float32
     staticMap.info.width = width;                                                      // uint32
     staticMap.info.height = height;                                                     // uint32
-    staticMap.info.origin.position.x = std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
-    staticMap.info.origin.position.y = std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
+    staticMap.info.origin.position.x = master_grid_origin_x;		//std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
+    staticMap.info.origin.position.y = master_grid_origin_y;		//std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
     staticMap.info.origin.orientation.w = master_grid_orientation;                                                      // same orientation as /map
     int p[n_cells];
     std::vector<signed char> a(p, p+n_cells);
@@ -136,8 +136,8 @@ void DynamicLayer::initStaticMapXxl()
     staticMap_xxl.info.resolution = resolution_xxl;                     // float32
     staticMap_xxl.info.width = width_xxl;                               // uint32
     staticMap_xxl.info.height = height_xxl;                             // uint32
-    staticMap_xxl.info.origin.position.x = std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);       // same origin as /map
-    staticMap_xxl.info.origin.position.y = std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);      // same origin as /map
+    staticMap_xxl.info.origin.position.x = master_grid_origin_x;		//std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
+    staticMap_xxl.info.origin.position.y = master_grid_origin_y;		//std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
     staticMap_xxl.info.origin.orientation.w = master_grid_orientation;                      // same orientation as /map
     int p[n_cells_xxl];
     std::vector<signed char> a(p, p+n_cells_xxl);
@@ -156,8 +156,8 @@ void DynamicLayer::initDynamicMap()
     dynamicMap.info.resolution = master_grid_resolution;                                                                // float32
     dynamicMap.info.width = width;                                                     // uint32
     dynamicMap.info.height = height;                                                    // uint32
-    dynamicMap.info.origin.position.x = std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);        // same origin as /map
-    dynamicMap.info.origin.position.y = std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);        // same origin as /map
+    dynamicMap.info.origin.position.x = master_grid_origin_x;		//std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
+    dynamicMap.info.origin.position.y = master_grid_origin_y;		//std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
     dynamicMap.info.origin.orientation.w = master_grid_orientation;                                                     // same orientation as /map
     int p[n_cells];
     std::vector<signed char> a(p, p+n_cells);
@@ -176,8 +176,8 @@ void DynamicLayer::initDynamicMapXxl()
     dynamicMap_xxl.info.resolution = resolution_xxl;                     // float32
     dynamicMap_xxl.info.width = width_xxl;                               // uint32
     dynamicMap_xxl.info.height = height_xxl;                             // uint32
-    dynamicMap_xxl.info.origin.position.x = std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);       // same origin as /map
-    dynamicMap_xxl.info.origin.position.y = std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);      // same origin as /map
+    dynamicMap_xxl.info.origin.position.x = master_grid_origin_x;		//std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
+    dynamicMap_xxl.info.origin.position.y = master_grid_origin_y;		//std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
     dynamicMap_xxl.info.origin.orientation.w = master_grid_orientation;                      // same orientation as /map
     int p[n_cells_xxl];
     std::vector<signed char> a(p, p+n_cells_xxl);
@@ -196,8 +196,8 @@ void DynamicLayer::initInputMap()
     inputMap.info.resolution = master_grid_resolution;                                                                 // float32
     inputMap.info.width = width;                                                      // uint32
     inputMap.info.height = height;                                                     // uint32
-    inputMap.info.origin.position.x = std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
-    inputMap.info.origin.position.y = std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
+    inputMap.info.origin.position.x = master_grid_origin_x;		//std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
+    inputMap.info.origin.position.y = master_grid_origin_y;		//std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
     inputMap.info.origin.orientation.w = master_grid_orientation;                                                      // same orientation as /map
     int p[n_cells];
     std::vector<signed char> a(p, p+n_cells);

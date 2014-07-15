@@ -20,8 +20,13 @@
 #include <perceive_tabletop_action/FindGoalPoseAction.h>
 #include <move_base_msgs/MoveBaseAction.h>
 
+// recovery behavior
+#include <nav_core/recovery_behavior.h>
+
 // class header
-class static_planner_node
+namespace scitos_2d_navigation
+{
+class static_planner_node : public nav_core:: RecoveryBehavior
 {
 public:
     
@@ -31,6 +36,12 @@ public:
     
     // public check for occupied path
     void check_path(); // needs tons of exception handles!!!
+    
+    // initialization of recovery behavior
+    void initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* global_costmap, costmap_2d::Costmap2DROS* local_costmap);
+
+    // run the recovery behavior
+    void runBehavior();
     
 protected:
 
@@ -81,7 +92,14 @@ protected:
     // clients
     actionlib::SimpleActionClient<perceive_tabletop_action::FindGoalPoseAction> *pose_client;
     actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> *move_base_client;
+    
+    // recovery behavior stuff
+    std::string name_;
+    bool initialized_;
+    tf::TransformListener* tf_;
+    costmap_2d::Costmap2DROS* global_costmap_;
+    costmap_2d::Costmap2DROS* local_costmap_;
 };
-
+};
 
 #endif // STATIC_PLANNER_H

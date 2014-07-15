@@ -1,10 +1,59 @@
 #include <scitos_2d_navigation/static_planner.h>
+#include <pluginlib/class_list_macros.h>
 
-// constructor
-static_planner_node::static_planner_node():
-    nh("~")
+
+//register this planner as a RecoveryBehavior plugin
+PLUGINLIB_DECLARE_CLASS(scitos_2d_navigation, static_planner_node, scitos_2d_navigation::static_planner_node, nav_core::RecoveryBehavior)
+
+namespace scitos_2d_navigation
 {
-    ROS_WARN("Initialize node");
+// constructor
+static_planner_node::static_planner_node() : initialized_(false)
+{
+    // void
+}
+    
+void static_planner_node::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* global_costmap, costmap_2d::Costmap2DROS* local_costmap)
+{
+    if(!initialized_){
+        name_ = name;
+        tf_ = tf;
+        global_costmap_ = global_costmap;
+        local_costmap_ = local_costmap;
+
+        //get some parameters from the parameter server
+        ros::NodeHandle nh("~/" + name_);
+
+        //private_nh.param("reset_distance", reset_distance_, 3.0);
+        //private_nh.param("layer_search_string", layer_search_string_, std::string("obstacle"));
+
+        initialized_ = true;
+    }
+    else {
+        ROS_ERROR("You should not call initialize twice on this object, doing nothing");
+    }
+};
+
+// destructor
+static_planner_node::~static_planner_node()
+{
+    // void
+};
+
+// Run behavior for recovery
+void static_planner_node::runBehavior()
+{
+    if(!initialized_){
+        ROS_ERROR("This object must be initialized before runBehavior is called");
+        return;
+    }
+
+    if(global_costmap_ == NULL || local_costmap_ == NULL){
+        ROS_ERROR("The costmaps passed to the ClearCostmapRecovery object cannot be NULL. Doing nothing.");
+        return;
+    }
+    
+    ROS_INFO("Initialize callbacks and clients for run behavior");
     
     // flags
     init_map = false;
@@ -30,18 +79,12 @@ static_planner_node::static_planner_node():
     
     move_base_client->waitForServer();
 
-    ROS_INFO("Finished init");
+    ROS_INFO("Finished init for run behavior");
     
     // subscribe to new goals (must be in the very end -> otherwise can jump out of init)
     subGoal = nh.subscribe("/move_base/current_goal", 2, &static_planner_node::goal_cb, this);
     subDynamicMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/dynamic_map_xxl", 2, &static_planner_node::dynamic_map_cb, this);
-};
-
-// destructor
-static_planner_node::~static_planner_node()
-{
-    // void
-};
+}
     
 void static_planner_node::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 {
@@ -229,13 +272,14 @@ void static_planner_node::check_path()
         }
     }
 }
-
-int main( int argc, char* argv[] )
-{
-    
-    ros::init(argc, argv, "static_planner");
-    static_planner_node x;
-
-    ros::spin();
-    return 0;
-}
+};
+//~ 
+//~ int main( int argc, char* argv[] )
+//~ {
+    //~ 
+    //~ ros::init(argc, argv, "static_planner");
+    //~ scitos_2d_navigation::static_planner_node x;
+//~ 
+    //~ ros::spin();
+    //~ return 0;
+//~ }

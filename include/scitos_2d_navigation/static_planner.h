@@ -14,7 +14,11 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Pose.h>
 
-
+// actionlib stuff
+#include <actionlib/client/simple_action_client.h>
+#include <actionlib/client/terminal_state.h>
+#include <perceive_tabletop_action/FindGoalPoseAction.h>
+#include <move_base_msgs/MoveBaseAction.h>
 
 // class header
 class static_planner_node
@@ -57,6 +61,10 @@ protected:
     double map_res;
     int mod_num;
     
+    // flags
+    bool debug;
+    bool block_for_block;
+    
     // listen to tf
     tf::TransformListener transform;
     
@@ -69,6 +77,10 @@ protected:
     
     // counters
     int cb_counter;
+    
+    // clients
+    actionlib::SimpleActionClient<perceive_tabletop_action::FindGoalPoseAction> *pose_client;
+    actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> *move_base_client;
 };
 
 

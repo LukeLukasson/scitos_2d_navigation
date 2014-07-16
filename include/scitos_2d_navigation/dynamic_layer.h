@@ -98,6 +98,8 @@ private:
     double master_grid_origin_y;
     double master_grid_orientation;
     double master_grid_resolution;
+    double master_grid_width_m;
+    double master_grid_height_m;
     
     // flags
     bool flag_init;

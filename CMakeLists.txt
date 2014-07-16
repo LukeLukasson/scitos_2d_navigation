@@ -16,6 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
                     navfn
                     strands_perception_msgs
                     ros_datacentre_cpp_client
+                    nav_core
+                    pluginlib
 )
 
 ## System dependencies are found with CMake's conventions
@@ -74,7 +76,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES dynamic_layer overwrite_layer smart_obstacle_layer static_planner 
-  CATKIN_DEPENDS costmap_2d dynamic_reconfigure roscpp
+  CATKIN_DEPENDS costmap_2d dynamic_reconfigure roscpp nav_core
   DEPENDS system_lib
 )
 
@@ -96,12 +98,13 @@ add_library(noise_approximate_voxel_grid src/noise_approximate_voxel_grid.cpp)
 add_library(dynamic_layer plugins/dynamic_layer.cpp)
 add_library(overwrite_layer plugins/overwrite_layer.cpp)
 add_library(smart_obstacle_layer plugins/smart_obstacle_layer.cpp)
+add_library(static_planner src/static_planner.cpp)
 
 ## Declare a cpp executable
 add_executable(subsample_cloud src/subsample_cloud.cpp)
 add_executable(remove_edges_cloud src/remove_edges_cloud.cpp)
 add_executable(mirror_floor_points src/mirror_floor_points.cpp)
-add_executable(static_planner src/static_planner.cpp)
+#~ add_executable(static_planner src/static_planner.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -151,11 +154,11 @@ target_link_libraries(static_planner
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS scitos_2d_navigation scitos_2d_navigation_node
+install(TARGETS static_planner
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+)
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/
@@ -165,11 +168,11 @@ target_link_libraries(static_planner
 # )
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
+install(FILES cvr_plugin.xml
+  # myfile1
+  # myfile2
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
 
 #############
 ## Testing ##

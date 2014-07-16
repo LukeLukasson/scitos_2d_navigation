@@ -1,5 +1,5 @@
-<library path="lib/libstatic_planner_recovery">
-  <class type="scitos_2d_navigation::static_planner_node" base_class_type="nav_core::RecoveryBehavior">
+<library path="lib/libstatic_planner">
+  <class name="scitos_2d_navigation/StaticPlannerRecovery" type="scitos_2d_navigation::StaticPlannerRecovery" base_class_type="nav_core::RecoveryBehavior">
     <description>
       A recovery behavior that makes the robot reobserve a dynamic area exposed by intersection with a global planner run on the static map.
     </description>

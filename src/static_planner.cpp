@@ -3,17 +3,17 @@
 
 
 //register this planner as a RecoveryBehavior plugin
-PLUGINLIB_DECLARE_CLASS(scitos_2d_navigation, static_planner_node, scitos_2d_navigation::static_planner_node, nav_core::RecoveryBehavior)
+PLUGINLIB_DECLARE_CLASS(scitos_2d_navigation, StaticPlannerRecovery, scitos_2d_navigation::StaticPlannerRecovery, nav_core::RecoveryBehavior)
 
 namespace scitos_2d_navigation
 {
 // constructor
-static_planner_node::static_planner_node() : initialized_(false)
+StaticPlannerRecovery::StaticPlannerRecovery() : initialized_(false)
 {
     // void
 }
     
-void static_planner_node::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* global_costmap, costmap_2d::Costmap2DROS* local_costmap)
+void StaticPlannerRecovery::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* global_costmap, costmap_2d::Costmap2DROS* local_costmap)
 {
     if(!initialized_){
         name_ = name;
@@ -35,13 +35,13 @@ void static_planner_node::initialize(std::string name, tf::TransformListener* tf
 };
 
 // destructor
-static_planner_node::~static_planner_node()
+StaticPlannerRecovery::~StaticPlannerRecovery()
 {
     // void
 };
 
 // Run behavior for recovery
-void static_planner_node::runBehavior()
+void StaticPlannerRecovery::runBehavior()
 {
     if(!initialized_){
         ROS_ERROR("This object must be initialized before runBehavior is called");
@@ -82,11 +82,11 @@ void static_planner_node::runBehavior()
     ROS_INFO("Finished init for run behavior");
     
     // subscribe to new goals (must be in the very end -> otherwise can jump out of init)
-    subGoal = nh.subscribe("/move_base/current_goal", 2, &static_planner_node::goal_cb, this);
-    subDynamicMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/dynamic_map_xxl", 2, &static_planner_node::dynamic_map_cb, this);
+    subGoal = nh.subscribe("/move_base/current_goal", 2, &StaticPlannerRecovery::goal_cb, this);
+    subDynamicMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/dynamic_map_xxl", 2, &StaticPlannerRecovery::dynamic_map_cb, this);
 }
     
-void static_planner_node::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
+void StaticPlannerRecovery::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 {
     ROS_WARN("+++ Callback new goal");
     
@@ -123,7 +123,7 @@ void static_planner_node::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
     }
 };
 
-void static_planner_node::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
+void StaticPlannerRecovery::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
 {
     if(debug)
     ROS_WARN("+++ Received dynamic map");
@@ -161,7 +161,7 @@ void static_planner_node::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicM
     pubDynMap->publishCostmap();
 };
 
-void static_planner_node::check_path()
+void StaticPlannerRecovery::check_path()
 {
     if(debug)
     ROS_WARN("+++ Checking path");

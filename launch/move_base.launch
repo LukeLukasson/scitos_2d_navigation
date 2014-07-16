@@ -11,6 +11,7 @@
 		<param name="controller_patience" value="15.0" />
 		<param name="planner_frequency" value="2.0" />
 		<param name="clearing_rotation_allowed" value="false" />
+		<rosparam param="recovery_behaviors"> [{name: "static_planner", type: "scitos_2d_navigation/StaticPlannerRecovery"}] </rosparam>
 		<rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/costmap_common_params.yaml" command="load" ns="global_costmap" />
 		<rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/costmap_common_params.yaml" command="load" ns="local_costmap" />
 		<rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/local_costmap_params.yaml" command="load" />
@@ -20,3 +21,7 @@
 	</node>
 
 </launch>
+
+<!--
+ , {name: "conservative_reset", type: "clear_costmap_recovery/ClearCostmapRecovery"}, {name: "clear_voxels", type: "clear_voxels_recovery/ClearVoxelsRecovery"}, {name: "aggressive_reset", type: "clear_costmap_recovery/ClearCostmapRecovery"}] 
+ -->

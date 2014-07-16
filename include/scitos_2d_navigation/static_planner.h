@@ -26,13 +26,13 @@
 // class header
 namespace scitos_2d_navigation
 {
-class static_planner_node : public nav_core:: RecoveryBehavior
+class StaticPlannerRecovery : public nav_core:: RecoveryBehavior
 {
 public:
     
     // constructor, destructor
-    static_planner_node();
-    ~static_planner_node();
+    StaticPlannerRecovery();
+    ~StaticPlannerRecovery();
     
     // public check for occupied path
     void check_path(); // needs tons of exception handles!!!

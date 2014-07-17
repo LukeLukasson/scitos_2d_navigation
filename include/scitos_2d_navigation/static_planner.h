@@ -75,6 +75,7 @@ protected:
     // flags
     bool debug;
     bool block_for_block;
+    bool finished_process;
     
     // listen to tf
     tf::TransformListener transform;

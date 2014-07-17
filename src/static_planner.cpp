@@ -28,6 +28,7 @@ void StaticPlannerRecovery::initialize(std::string name, tf::TransformListener* 
         //private_nh.param("layer_search_string", layer_search_string_, std::string("obstacle"));
 
         initialized_ = true;
+        
     }
     else {
         ROS_ERROR("You should not call initialize twice on this object, doing nothing");
@@ -57,8 +58,9 @@ void StaticPlannerRecovery::runBehavior()
     
     // flags
     init_map = false;
-    debug = false;
+    debug = true;
     block_for_block = false;
+    finished_process = false;
  
     // init the layered costmap
     costmap = new costmap_2d::Costmap2DROS("static_costmap", transform);
@@ -84,6 +86,13 @@ void StaticPlannerRecovery::runBehavior()
     // subscribe to new goals (must be in the very end -> otherwise can jump out of init)
     subGoal = nh.subscribe("/move_base/current_goal", 2, &StaticPlannerRecovery::goal_cb, this);
     subDynamicMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/dynamic_map_xxl", 2, &StaticPlannerRecovery::dynamic_map_cb, this);
+    
+    // let it spin until it did its job
+    while(!finished_process) {
+		ros::spin();
+	}
+	
+	ROS_INFO("Finished runBehavior");
 }
     
 void StaticPlannerRecovery::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
@@ -140,13 +149,15 @@ void StaticPlannerRecovery::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynami
         
         init_map = true;
         
-        // just copy dynamicMap for visMap
+        // just copy dynamicMap for tableMap and dynMap
         tableMap = new costmap_2d::Costmap2D(map_width, map_height, map_res, map_origin_x, map_origin_y);
         dynMap = new costmap_2d::Costmap2D(map_width, map_height, map_res, map_origin_x, map_origin_y);
         
         // publisher
         pubTableMap = new costmap_2d::Costmap2DPublisher(&nh, tableMap, "/map", "/table_map", true);        
-        pubDynMap = new costmap_2d::Costmap2DPublisher(&nh, dynMap, "/map", "/dynamic_map_xxl_copy", true);        
+        pubDynMap = new costmap_2d::Costmap2DPublisher(&nh, dynMap, "/map", "/dynamic_map_xxl_copy", true);
+        
+        ROS_INFO("Initialized all the maps");
 
     }
     
@@ -254,6 +265,11 @@ void StaticPlannerRecovery::check_path()
                     
                     // free up block_for_block
                     block_for_block = false;
+                    
+                    // executed job
+                    if(debug) ROS_INFO("Finished the process");
+                    finished_process = true;
+
 
                 } else {
                     ROS_INFO("Find goal pose not finish before the time out.");

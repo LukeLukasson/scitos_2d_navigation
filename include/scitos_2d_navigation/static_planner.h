@@ -64,7 +64,6 @@ protected:
     // maps
     costmap_2d::Costmap2D *tableMap;
     costmap_2d::Costmap2D *dynMap;
-    bool init_map;
     double map_width;
     double map_height;
     double map_origin_x;
@@ -76,9 +75,12 @@ protected:
     bool debug;
     bool block_for_block;
     bool finished_process;
+    bool got_map;
+    bool got_goal;
+    bool check_path_is_active;
     
     // listen to tf
-    tf::TransformListener transform;
+    //~ tf::TransformListener transform;
     
     // init
     costmap_2d::Costmap2DROS *costmap;

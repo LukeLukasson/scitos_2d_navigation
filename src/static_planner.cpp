@@ -1,34 +1,21 @@
 #include <scitos_2d_navigation/static_planner.h>
 #include <pluginlib/class_list_macros.h>
 
-
-//register this planner as a RecoveryBehavior plugin
-PLUGINLIB_DECLARE_CLASS(scitos_2d_navigation, StaticPlannerRecovery, scitos_2d_navigation::StaticPlannerRecovery, nav_core::RecoveryBehavior)
-
 namespace scitos_2d_navigation
 {
 // constructor
-StaticPlannerRecovery::StaticPlannerRecovery() : initialized_(false)
+StaticPlanner::StaticPlanner(std::string name) : unleash_server(nh, name, boost::bind(&StaticPlanner::execute_cb, this, _1), false), action_name(name)
 {
-    // void
-}
-    
-void StaticPlannerRecovery::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* global_costmap, costmap_2d::Costmap2DROS* local_costmap)
-{
-    if(!initialized_){
-        name_ = name;
-        tf_ = tf;
-        global_costmap_ = global_costmap;
-        local_costmap_ = local_costmap;
 
-        //get some parameters from the parameter server
-        ros::NodeHandle nh("~/" + name_);
+        ros::NodeHandle nh("~/");
 
         //private_nh.param("reset_distance", reset_distance_, 3.0);
         //private_nh.param("layer_search_string", layer_search_string_, std::string("obstacle"));
+        ROS_INFO("Start server");
         
+        unleash_server.start();
 
-		ROS_INFO("Initialize callbacks and clients for run behavior");
+		ROS_INFO("Initialize callbacks and clients");
 		
 		// flags
 		debug = true;
@@ -39,19 +26,19 @@ void StaticPlannerRecovery::initialize(std::string name, tf::TransformListener* 
 		check_path_is_active = false;
 		
 		// try...
-		tf::StampedTransform transform;
-		try{
-			tf_->lookupTransform("/map", "/base_link", ros::Time(0), transform);
-			ROS_INFO("Successfully found /map to /base_link tranformation via tf_");
-		} catch(tf::TransformException ex) {
-			ROS_ERROR("%s",ex.what());
-			ros::Duration(1.0).sleep();
-		}
+		//~ tf::StampedTransform transform_stmpd;
+		//~ try{
+			//~ transform.lookupTransform("map", "base_link", ros::Time(0), transform_stmpd);
+			//~ ROS_INFO("Successfully found /map to /base_link tranformation via tf_");
+		//~ } catch(tf::TransformException ex) {
+			//~ ROS_ERROR("%s",ex.what());
+			//~ ros::Duration(1.0).sleep();
+		//~ }
 		
-		ros::Duration(2.0).sleep();
+		//~ ros::Duration(2.0).sleep();
 		
 		// init the layered costmap
-		costmap = new costmap_2d::Costmap2DROS("static_costmap", *tf_);
+		costmap = new costmap_2d::Costmap2DROS("static_costmap", transform);
 		
 		// init the planner with the updating rate
 		navfn_plan.initialize("static_planner", costmap);
@@ -69,56 +56,21 @@ void StaticPlannerRecovery::initialize(std::string name, tf::TransformListener* 
 		//ROS_INFO("Waiting for action server move_base to start");
 		//move_base_client->waitForServer();
 
-		ROS_INFO("Finished init for run behavior");
-		
+		ROS_INFO("Finished init for static planner");
+
 		// subscribe to new goals (must be in the very end -> otherwise can jump out of init)
-		subGoal = nh.subscribe("/move_base/current_goal", 2, &StaticPlannerRecovery::goal_cb, this);
-		subDynamicMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/dynamic_map_xxl", 2, &StaticPlannerRecovery::dynamic_map_cb, this);
+		subGoal = nh.subscribe("/move_base/current_goal", 2, &StaticPlanner::goal_cb, this);
+		subDynamicMap = nh.subscribe("/move_base/global_costmap/dynamic_layer/dynamic_map_xxl", 2, &StaticPlanner::dynamic_map_cb, this);
 
-        
-
-        initialized_ = true;
-        
-    }
-    else {
-        ROS_ERROR("You should not call initialize twice on this object, doing nothing");
-    }
-};
+}
 
 // destructor
-StaticPlannerRecovery::~StaticPlannerRecovery()
+StaticPlanner::~StaticPlanner()
 {
     // void
 };
 
-// Run behavior for recovery
-void StaticPlannerRecovery::runBehavior()
-{
-    if(!initialized_){
-        ROS_ERROR("This object must be initialized before runBehavior is called");
-        return;
-    }
-
-    if(global_costmap_ == NULL || local_costmap_ == NULL){
-        ROS_ERROR("The costmaps passed to the ClearCostmapRecovery object cannot be NULL. Doing nothing.");
-        return;
-    }
-        
-    // do we have a dynamic map and a pathplanner running?
-    ROS_INFO_STREAM("got_map: " << got_map << " - got_goal: " << got_goal);
-    if(got_map && got_goal) {
-				
-		check_path();
-		ROS_INFO("Successfully executed check_path();");
-	} else {
-		ROS_ERROR("No map and no goal available!");
-	}
-	
-	ROS_INFO("Finished runBehavior");
-	return;
-}
-    
-void StaticPlannerRecovery::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
+void StaticPlanner::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 {
     ROS_WARN("+++ Callback new goal");
     
@@ -131,13 +83,13 @@ void StaticPlannerRecovery::goal_cb(const geometry_msgs::PoseStampedConstPtr &ms
 			// core of the planning algorithm
 			geometry_msgs::PoseStamped tmsg;
 
-			tf_->transformPose("/map", *msg, tmsg);
+			transform.transformPose("/map", *msg, tmsg);
 			geometry_msgs::PoseStamped start = tmsg, tstart;
 			start.header.frame_id = "/base_link";
 			start.pose.position.x = 0;
 			start.pose.position.y = 0;
 			start.pose.position.z = 0;
-			tf_->transformPose( "/map", start, tstart );
+			transform.transformPose( "/map", start, tstart );
 
 			//~ ROS_INFO("plan(%s): (%f,%f) ==> (%f,%f)", tmsg.header.frame_id.c_str(), tstart.pose.position.x,tstart.pose.position.y,tmsg.pose.position.x,tmsg.pose.position.y);
 
@@ -151,7 +103,6 @@ void StaticPlannerRecovery::goal_cb(const geometry_msgs::PoseStampedConstPtr &ms
 			
 			// one is good enought... right?
 			got_goal = true;
-			//~ ROS_ERROR("got_goal -> true");
 			
 			ros::spinOnce();    // important not to ignore any callbacks!
 			loop_rate->sleep();
@@ -159,7 +110,7 @@ void StaticPlannerRecovery::goal_cb(const geometry_msgs::PoseStampedConstPtr &ms
 	}
 };
 
-void StaticPlannerRecovery::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
+void StaticPlanner::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
 {
     if(debug)
     ROS_WARN("+++ Received dynamic map");
@@ -198,57 +149,56 @@ void StaticPlannerRecovery::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynami
     pubTableMap->publishCostmap();
     pubDynMap->publishCostmap();
 
-	if(debug) ROS_INFO("+++ Before check_path_is_active");
-	if(!check_path_is_active) {
-		
-		check_path_is_active = true;
-		// try to send rosie just somewhere!
-		geometry_msgs::PoseStamped next_goal;
-
-		next_goal.header.stamp = ros::Time::now();
-		next_goal.header.frame_id = "base_link";
-		next_goal.pose.position.x = -6.0;
-		next_goal.pose.position.y = 4.0;
-		next_goal.pose.position.z = 0.0;
-		next_goal.pose.orientation.x = 0.0;
-		next_goal.pose.orientation.y = 0.0;
-		next_goal.pose.orientation.z = 0.0;
-		next_goal.pose.orientation.w = 1.0;
-
-		move_base_msgs::MoveBaseGoal next_move_base_goal;
-		next_move_base_goal.target_pose = next_goal;
-
-		ROS_INFO("Are we connected?");
-		//~ //actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-		bool state_move_base_connected = move_base_client->isServerConnected();
-		ROS_INFO_STREAM("Connected: " << state_move_base_connected);
-		//~ //ROS_INFO("Situation before cancelling");
-		//~ //actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-		//~ //ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
+	//~ if(!check_path_is_active) {
 		//~ 
-		// send it to move_base
-		ROS_INFO("Cancel all goals");
-		move_base_client->cancelAllGoals();
-		//~ //move_base_client->waitForResult(ros::Duration(10.0));
-		//~ //state_move_base = move_base_client->getState();
-		//~ //ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
-
-		ROS_INFO("Send new goal");
-		//~ move_base_client->sendGoalAndWait(next_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
-		move_base_client->sendGoal(next_move_base_goal);
-		actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-		ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
-		move_base_client->waitForResult(ros::Duration(120.0));
+		//~ check_path_is_active = true;
+		//~ // try to send rosie just somewhere!
+		//~ geometry_msgs::PoseStamped next_goal;
+//~ 
+		//~ next_goal.header.stamp = ros::Time::now();
+		//~ next_goal.header.frame_id = "map";
+		//~ next_goal.pose.position.x = -6.0;
+		//~ next_goal.pose.position.y = 4.0;
+		//~ next_goal.pose.position.z = 0.0;
+		//~ next_goal.pose.orientation.x = 0.0;
+		//~ next_goal.pose.orientation.y = 0.0;
+		//~ next_goal.pose.orientation.z = 0.0;
+		//~ next_goal.pose.orientation.w = 1.0;
+//~ 
+		//~ move_base_msgs::MoveBaseGoal next_move_base_goal;
+		//~ next_move_base_goal.target_pose = next_goal;
+//~ 
+		//~ ROS_INFO("Are we connected?");
+		//actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
+		//~ bool state_move_base_connected = move_base_client->isServerConnected();
+		//~ ROS_INFO_STREAM("Connected: " << state_move_base_connected);
+		//ROS_INFO("Situation before cancelling");
+		//actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
+		//ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
 		
-		if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-			ROS_INFO("Moved into position!");
-		} else {
-			ROS_INFO("Move failed!");
-		}
-	}
+		//~ // send it to move_base
+		//~ ROS_INFO("Cancel all goals");
+		//~ move_base_client->cancelAllGoals();
+		//move_base_client->waitForResult(ros::Duration(10.0));
+		//state_move_base = move_base_client->getState(); 
+		//ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
+//~ 
+		//~ ROS_INFO("Send new goal");
+		//~ //move_base_client->sendGoalAndWait(next_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
+		//~ move_base_client->sendGoal(next_move_base_goal);
+		//~ actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
+		//~ ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
+		//~ move_base_client->waitForResult(ros::Duration(120.0));
+		//~ 
+		//~ if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+			//~ ROS_INFO("Moved into position!");
+		//~ } else {
+			//~ ROS_INFO("Move failed!");
+		//~ }
+	//~ }
 };
 
-void StaticPlannerRecovery::check_path()
+void StaticPlanner::check_path()
 {
 	// in order to block out the cb for a new goal
 	check_path_is_active = true;
@@ -273,7 +223,7 @@ void StaticPlannerRecovery::check_path()
 		int value_map = (int)dynMap->getCost(i_xxl, j_xxl);
 		
 		//~ ROS_INFO_STREAM("value_map: " << value_map << " - block_for_block: " << block_for_block);
-		// check if there is a dynamic obstacle (maybe more conservative over 51?)
+		// check if there is a dynamic obstacle (maybe more agressive over 51?)
 		if(value_map > 90 && !block_for_block) {
 			// block for the found block
 			block_for_block = true;
@@ -286,7 +236,7 @@ void StaticPlannerRecovery::check_path()
 			
 			// create message to send to simple_view_planner
 			perceive_tabletop_action::FindGoalPoseGoal goal;
-			
+
 			// put table into polygon
 			goal.polygon.points.resize(4);
 			
@@ -325,6 +275,7 @@ void StaticPlannerRecovery::check_path()
 				geometry_msgs::PoseStamped next_goal;
 				
 				next_goal.header.stamp = ros::Time::now();
+				next_goal.header.frame_id = "map";
 				next_goal.pose = result_pose;
 				
 				move_base_msgs::MoveBaseAction next_goal_action;
@@ -377,15 +328,27 @@ void StaticPlannerRecovery::check_path()
     
     // free up cb for new goals again
     check_path_is_active = false;
+    
+    ROS_INFO("Finished checking path");
 }
+
+void StaticPlanner::execute_cb(const scitos_2d_navigation::UnleashStaticPlannerGoalConstPtr &goal)
+{
+	ROS_ERROR("Executing action server call");
+	//~ subDynamicMap.shutdown();
+	//~ subGoal.shutdown();
+	check_path();
+	unleash_server.setSucceeded();
 };
-//~ 
-//~ int main( int argc, char* argv[] )
-//~ {
-    //~ 
-    //~ ros::init(argc, argv, "static_planner");
-    //~ scitos_2d_navigation::static_planner_node x;
-//~ 
-    //~ ros::spin();
-    //~ return 0;
-//~ }
+};
+
+int main( int argc, char* argv[] )
+{
+    
+    ros::init(argc, argv, "static_planner");
+    
+    scitos_2d_navigation::StaticPlanner unleash_static_planner(ros::this_node::getName());
+
+    ros::spin();
+    return 0;
+}

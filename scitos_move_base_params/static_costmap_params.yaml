@@ -1,5 +1,3 @@
-#~ global_frame: /move_base/global_costmap/dynamic_layer/static_map
-#~ global_frame: /map
 update_frequency: 5.0
 static_map: true
 rolling_window: false
@@ -26,8 +24,8 @@ footprint: [[0.235, 0.31], [-0.515, 0.31], [-0.515, -0.31], [0.235, -0.31]]
 
 
 overwrite_layer:
-  #~ map_topic: /map
-  map_topic: /move_base/global_costmap/dynamic_layer/static_map
+  map_topic: /map
+  #~ map_topic: /move_base/global_costmap/dynamic_layer/static_map
   use_maximum: false
 
 no_go_layer:
@@ -36,7 +34,7 @@ no_go_layer:
 inflation_layer:
   inflation_radius: 0.8
   cost_scaling_factor: 10.0
-    
+  
 
 obstacle_layer:
   max_obstacle_height: 2.0

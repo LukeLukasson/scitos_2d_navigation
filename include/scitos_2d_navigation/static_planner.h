@@ -16,33 +16,29 @@
 
 // actionlib stuff
 #include <actionlib/client/simple_action_client.h>
+#include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/terminal_state.h>
 #include <perceive_tabletop_action/FindGoalPoseAction.h>
 #include <move_base_msgs/MoveBaseAction.h>
-
-// recovery behavior
-#include <nav_core/recovery_behavior.h>
+#include <scitos_2d_navigation/UnleashStaticPlannerAction.h>
 
 // class header
 namespace scitos_2d_navigation
 {
-class StaticPlannerRecovery : public nav_core:: RecoveryBehavior
+class StaticPlanner
 {
 public:
     
     // constructor, destructor
-    StaticPlannerRecovery();
-    ~StaticPlannerRecovery();
+    StaticPlanner(std::string name);
+    ~StaticPlanner();
     
     // public check for occupied path
     void check_path(); // needs tons of exception handles!!!
     
-    // initialization of recovery behavior
-    void initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* global_costmap, costmap_2d::Costmap2DROS* local_costmap);
+    // server
+	void execute_cb(const scitos_2d_navigation::UnleashStaticPlannerGoalConstPtr &goal);
 
-    // run the recovery behavior
-    void runBehavior();
-    
 protected:
 
     // callback for goal subscriber
@@ -80,7 +76,7 @@ protected:
     bool check_path_is_active;
     
     // listen to tf
-    //~ tf::TransformListener transform;
+    tf::TransformListener transform;
     
     // init
     costmap_2d::Costmap2DROS *costmap;
@@ -96,12 +92,10 @@ protected:
     actionlib::SimpleActionClient<perceive_tabletop_action::FindGoalPoseAction> *pose_client;
     actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> *move_base_client;
     
-    // recovery behavior stuff
-    std::string name_;
-    bool initialized_;
-    tf::TransformListener* tf_;
-    costmap_2d::Costmap2DROS* global_costmap_;
-    costmap_2d::Costmap2DROS* local_costmap_;
+    // server
+    actionlib::SimpleActionServer<scitos_2d_navigation::UnleashStaticPlannerAction> unleash_server;
+    std::string action_name;
+
 };
 };
 

@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
                     ros_datacentre_cpp_client
                     nav_core
                     pluginlib
+                    actionlib_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -44,12 +45,16 @@ generate_dynamic_reconfigure_options(
 ## Declare ROS messages and services ##
 #######################################
 
+## Generate messages in the 'action' folder
+add_action_files(
+  DIRECTORY action
+  FILES UnleashStaticPlanner.action
+)
+
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+#~ add_message_files(
+  #~ DEPENDENCIES actionlib_msgs std_msgs
+#~ )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -59,11 +64,11 @@ generate_dynamic_reconfigure_options(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-#~ generate_messages(
-    #~ DEPENDENCIES
-    #~ std_msgs  # Or other packages containing msgs
-    #~ strands_perception_msgs
-#~ )
+generate_messages(
+    DEPENDENCIES
+    std_msgs  # Or other packages containing msgs
+    actionlib_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -75,8 +80,8 @@ generate_dynamic_reconfigure_options(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES dynamic_layer overwrite_layer smart_obstacle_layer static_planner 
-  CATKIN_DEPENDS costmap_2d dynamic_reconfigure roscpp nav_core
+  LIBRARIES dynamic_layer overwrite_layer smart_obstacle_layer unleash_static_planner static_planner 
+  CATKIN_DEPENDS costmap_2d dynamic_reconfigure roscpp nav_core actionlib_msgs
   DEPENDS system_lib
 )
 
@@ -98,13 +103,14 @@ add_library(noise_approximate_voxel_grid src/noise_approximate_voxel_grid.cpp)
 add_library(dynamic_layer plugins/dynamic_layer.cpp)
 add_library(overwrite_layer plugins/overwrite_layer.cpp)
 add_library(smart_obstacle_layer plugins/smart_obstacle_layer.cpp)
-add_library(static_planner src/static_planner.cpp)
+add_library(unleash_static_planner plugins/unleash_static_planner.cpp)
 
 ## Declare a cpp executable
 add_executable(subsample_cloud src/subsample_cloud.cpp)
 add_executable(remove_edges_cloud src/remove_edges_cloud.cpp)
 add_executable(mirror_floor_points src/mirror_floor_points.cpp)
-#~ add_executable(static_planner src/static_planner.cpp)
+add_executable(goal_caller src/goal_caller.cpp)
+add_executable(static_planner src/static_planner.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -115,8 +121,12 @@ add_dependencies(overwrite_layer plugins/overwrite_layer.cpp)
 add_dependencies(overwrite_layer overwrite_layer_gencfg) # please do not ask me why... black magic maybe?
 add_dependencies(smart_obstacle_layer plugins/smart_obstacle_layer.cpp)
 add_dependencies(smart_obstacle_layer smart_obstacle_layer_gencfg) # please do not ask me why... black magic maybe?
+add_dependencies(unleash_static_planner plugins/unleash_static_planner.cpp)
+add_dependencies(unleash_static_planner strands_perception_msgs_generate_messages_cpp)
 add_dependencies(static_planner src/static_planner.cpp)
 add_dependencies(static_planner strands_perception_msgs_generate_messages_cpp)
+add_dependencies(static_planner ${scitos_2d_navigation_EXPORTED_TARGETS})
+#~ add_dependencies(goal_caller src/goal_caller.cpp)
 
 target_link_libraries(noise_approximate_voxel_grid
   ${PCL_LIBRARIES}
@@ -134,7 +144,15 @@ target_link_libraries(mirror_floor_points
   ${catkin_LIBRARIES} ${PCL_LIBRARIES}
 )
 
+target_link_libraries(unleash_static_planner
+  ${catkin_LIBRARIES} ${PCL_LIBRARIES}
+)
+
 target_link_libraries(static_planner
+  ${catkin_LIBRARIES} ${PCL_LIBRARIES}
+)
+
+target_link_libraries(goal_caller
   ${catkin_LIBRARIES} ${PCL_LIBRARIES}
 )
 
@@ -154,7 +172,7 @@ target_link_libraries(static_planner
 # )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS static_planner
+install(TARGETS unleash_static_planner
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

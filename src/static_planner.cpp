@@ -9,8 +9,6 @@ StaticPlanner::StaticPlanner(std::string name) : unleash_server(nh, name, boost:
 
         ros::NodeHandle nh("~/");
 
-        //private_nh.param("reset_distance", reset_distance_, 3.0);
-        //private_nh.param("layer_search_string", layer_search_string_, std::string("obstacle"));
         ROS_INFO("Start server");
         
         unleash_server.start();
@@ -24,18 +22,6 @@ StaticPlanner::StaticPlanner(std::string name) : unleash_server(nh, name, boost:
 		got_map = false;
 		got_goal = false;
 		check_path_is_active = false;
-		
-		// try...
-		//~ tf::StampedTransform transform_stmpd;
-		//~ try{
-			//~ transform.lookupTransform("map", "base_link", ros::Time(0), transform_stmpd);
-			//~ ROS_INFO("Successfully found /map to /base_link tranformation via tf_");
-		//~ } catch(tf::TransformException ex) {
-			//~ ROS_ERROR("%s",ex.what());
-			//~ ros::Duration(1.0).sleep();
-		//~ }
-		
-		//~ ros::Duration(2.0).sleep();
 		
 		// init the layered costmap
 		costmap = new costmap_2d::Costmap2DROS("static_costmap", transform);
@@ -53,10 +39,6 @@ StaticPlanner::StaticPlanner(std::string name) : unleash_server(nh, name, boost:
 		ROS_INFO("Waiting for action server find_goal_pose to start");
 		
 		pose_client->waitForServer();
-		
-		// maybe not neccessary since the move_base is initiating everything anyways?
-		//ROS_INFO("Waiting for action server move_base to start");
-		//move_base_client->waitForServer();
 
 		ROS_INFO("Finished init for static planner");
 
@@ -74,10 +56,10 @@ StaticPlanner::~StaticPlanner()
 
 void StaticPlanner::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 {
-    ROS_WARN("+++ Callback new goal");
     
     // only calculate new path when check_path is not active
     if(!check_path_is_active && got_map) {
+    ROS_WARN("+++ Callback new goal");
 		
 		// keep it alive in order to keep the path updated
 		while(ros::ok() && !check_path_is_active) {
@@ -86,6 +68,10 @@ void StaticPlanner::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 			geometry_msgs::PoseStamped tmsg;
 
 			transform.transformPose("/map", *msg, tmsg);
+			
+			// store original goal -> will not be overwritten due to the check_path_is_active protection
+			original_goal = tmsg;
+			
 			geometry_msgs::PoseStamped start = tmsg, tstart;
 			start.header.frame_id = "/base_link";
 			start.pose.position.x = 0;
@@ -268,6 +254,82 @@ void StaticPlanner::check_path()
 				
 				if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
 					ROS_INFO("Moved into position!");
+					
+					// try to interact or move to the original goal
+					ROS_INFO("Checking if oringal pose reachable:");
+					bool reachable = pose_is_reachable(original_goal);
+					
+					// if reachable go there again
+					if(reachable) {
+						
+						ROS_INFO("Send Rosie to the original goal!");
+						
+						// free it up for recovery behavior... smart idea? I hope so... Needs testing though
+						check_path_is_active = false;
+						block_for_block = false;
+						
+						// send it to move_base
+						move_base_msgs::MoveBaseAction original_goal_action;
+						original_goal_action.action_goal.goal.target_pose = original_goal;
+						move_base_client->sendGoalAndWait(original_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
+
+						// if reached the whole recovery was a success and we can exit
+						if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+							block_for_block = false;
+							check_path_is_active = false;
+							ROS_INFO("Successfully recovered! Good job Rosie!");
+							return;
+							
+						} else { // otherwise we try to interact with the dynamic object
+						
+							ROS_WARN("Pose reachable but not successfully reached -> Abort");
+							block_for_block = false;
+							check_path_is_active = false;
+							return;							
+						}
+					} else {
+						ROS_INFO("Orignal goal still not reachable");
+						ROS_WARN("Move bitch! -> Activating Rambo-Mode");
+						ROS_ERROR("10");
+						ros::Duration(1).sleep();
+						ROS_ERROR("9");
+						ros::Duration(1).sleep();
+						ROS_ERROR("8");
+						ros::Duration(1).sleep();
+						ROS_ERROR("7");
+						ros::Duration(1).sleep();
+						ROS_ERROR("6");
+						ros::Duration(1).sleep();
+						ROS_ERROR("5");
+						ros::Duration(1).sleep();
+						ROS_ERROR("4");
+						ros::Duration(1).sleep();
+						ROS_ERROR("3");
+						ros::Duration(1).sleep();
+						ROS_ERROR("2");
+						ros::Duration(1).sleep();
+						ROS_ERROR("1");
+						ros::Duration(1).sleep();
+						
+						// try one last time
+						ROS_INFO("We try one last time...");
+						move_base_msgs::MoveBaseAction original_goal_action;
+						original_goal_action.action_goal.goal.target_pose = original_goal;
+						move_base_client->sendGoalAndWait(original_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
+						// if reached the whole recovery was a success and we can exit
+						if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+							block_for_block = false;
+							check_path_is_active = false;
+							ROS_INFO("Successfully recovered! Good job Rosie!");
+							return;
+							
+						} else {
+							ROS_ERROR("Rosie is designed to help dynamic obstacles, not to harm them. The algorithm therefore aborts.");
+							// don't free up nothing -> recovery failed								
+							return;
+						}
+					}
+					
 				} else {
 					ROS_INFO("Move failed!");
 				}
@@ -293,7 +355,7 @@ void StaticPlanner::check_path()
     // free up cb for new goals again
     check_path_is_active = false;
     
-    ROS_INFO("Finished checking path");
+    ROS_INFO("Finished check_path()");
 }
 
 bool StaticPlanner::pose_is_reachable(const geometry_msgs::PoseStamped &check_pose)
@@ -313,10 +375,10 @@ bool StaticPlanner::pose_is_reachable(const geometry_msgs::PoseStamped &check_po
 	std::vector<geometry_msgs::PoseStamped> global_path;
 	bool plan_found_in_global = navfn_check_global.makePlan(tstart, tmsg, global_path);
 	if(!plan_found_in_global) {
-		ROS_WARN("Goal not reachable");
+		ROS_WARN("Pose not reachable");
 		return false;
 	} else {
-		ROS_WARN("Goal reachable");
+		ROS_WARN("Pose reachable");
 		return true;
 	}
 };

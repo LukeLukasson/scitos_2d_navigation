@@ -89,6 +89,9 @@ protected:
     // make path available globally
     std::vector<geometry_msgs::PoseStamped> path;
     
+    // store original goal
+    geometry_msgs::PoseStamped original_goal;
+        
     // counters
     int cb_counter;
     

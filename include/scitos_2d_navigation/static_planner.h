@@ -32,10 +32,7 @@ public:
     // constructor, destructor
     StaticPlanner(std::string name);
     ~StaticPlanner();
-    
-    // public check for occupied path
-    void check_path(); // needs tons of exception handles!!!
-    
+        
     // server
 	void execute_cb(const scitos_2d_navigation::UnleashStaticPlannerGoalConstPtr &goal);
 
@@ -44,6 +41,11 @@ protected:
     // callback for goal subscriber
     void goal_cb(const geometry_msgs::PoseStampedConstPtr &msg);
     void dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn);
+    
+    // public check for occupied path
+    void check_path(); // needs tons of exception handles!!!
+    
+    bool pose_is_reachable(const geometry_msgs::PoseStamped &check_pose);
     
     // ROS handles
     ros::NodeHandle nh;
@@ -80,7 +82,9 @@ protected:
     
     // init
     costmap_2d::Costmap2DROS *costmap;
+    costmap_2d::Costmap2DROS *global_costmap_copy;
     navfn::NavfnROS navfn_plan;
+    navfn::NavfnROS navfn_check_global;
     
     // make path available globally
     std::vector<geometry_msgs::PoseStamped> path;

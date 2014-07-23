@@ -39,10 +39,12 @@ StaticPlanner::StaticPlanner(std::string name) : unleash_server(nh, name, boost:
 		
 		// init the layered costmap
 		costmap = new costmap_2d::Costmap2DROS("static_costmap", transform);
+		global_costmap_copy = new costmap_2d::Costmap2DROS("global_costmap_copy", transform);
 		
 		// init the planner with the updating rate
 		navfn_plan.initialize("static_planner", costmap);
 		loop_rate = new ros::Rate(1.0);
+		navfn_check_global.initialize("global_planner_copy", global_costmap_copy);
 		
 		// init the action clients
 		pose_client = new actionlib::SimpleActionClient<perceive_tabletop_action::FindGoalPoseAction>("find_goal_pose", true);
@@ -98,7 +100,6 @@ void StaticPlanner::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 			if(!planned) {
 				ROS_WARN("plan did not succeed");
 			}
-
 			navfn_plan.publishPlan(path, 0.0, .8, 0.0, 0.2);
 			
 			// one is good enought... right?
@@ -112,7 +113,7 @@ void StaticPlanner::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 
 void StaticPlanner::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
 {
-    if(debug)
+    if(debug && !got_map)
     ROS_WARN("+++ Received dynamic map");
     
     if(!got_map) {        
@@ -149,53 +150,6 @@ void StaticPlanner::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
     pubTableMap->publishCostmap();
     pubDynMap->publishCostmap();
 
-	//~ if(!check_path_is_active) {
-		//~ 
-		//~ check_path_is_active = true;
-		//~ // try to send rosie just somewhere!
-		//~ geometry_msgs::PoseStamped next_goal;
-//~ 
-		//~ next_goal.header.stamp = ros::Time::now();
-		//~ next_goal.header.frame_id = "map";
-		//~ next_goal.pose.position.x = -6.0;
-		//~ next_goal.pose.position.y = 4.0;
-		//~ next_goal.pose.position.z = 0.0;
-		//~ next_goal.pose.orientation.x = 0.0;
-		//~ next_goal.pose.orientation.y = 0.0;
-		//~ next_goal.pose.orientation.z = 0.0;
-		//~ next_goal.pose.orientation.w = 1.0;
-//~ 
-		//~ move_base_msgs::MoveBaseGoal next_move_base_goal;
-		//~ next_move_base_goal.target_pose = next_goal;
-//~ 
-		//~ ROS_INFO("Are we connected?");
-		//actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-		//~ bool state_move_base_connected = move_base_client->isServerConnected();
-		//~ ROS_INFO_STREAM("Connected: " << state_move_base_connected);
-		//ROS_INFO("Situation before cancelling");
-		//actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-		//ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
-		
-		//~ // send it to move_base
-		//~ ROS_INFO("Cancel all goals");
-		//~ move_base_client->cancelAllGoals();
-		//move_base_client->waitForResult(ros::Duration(10.0));
-		//state_move_base = move_base_client->getState(); 
-		//ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
-//~ 
-		//~ ROS_INFO("Send new goal");
-		//~ //move_base_client->sendGoalAndWait(next_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
-		//~ move_base_client->sendGoal(next_move_base_goal);
-		//~ actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-		//~ ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
-		//~ move_base_client->waitForResult(ros::Duration(120.0));
-		//~ 
-		//~ if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-			//~ ROS_INFO("Moved into position!");
-		//~ } else {
-			//~ ROS_INFO("Move failed!");
-		//~ }
-	//~ }
 };
 
 void StaticPlanner::check_path()
@@ -254,12 +208,14 @@ void StaticPlanner::check_path()
 			goal.polygon.points[3].y = map_origin_y + j_xxl*map_res;
 			goal.polygon.points[3].z = 0;
 			
+			try_again:
+			
 			// send it to the client
 			pose_client->sendGoal(goal);
 			
 			// initialize result
 			geometry_msgs::Pose result_pose;
-			
+
 			// wait for the action to return
 			bool finished_before_timeout = pose_client->waitForResult(ros::Duration(240.0));
 			
@@ -269,14 +225,22 @@ void StaticPlanner::check_path()
 				ROS_INFO("Find goal pose finished: %s",state.toString().c_str());
 				result_pose = pose_client->getResult()->goal_pose;
 				
-				ROS_INFO("Sending Rosie to (x,y,z): (%f, %f, %f)", result_pose.position.x, result_pose.position.y, result_pose.position.z);
-				
 				// mold everything to send it to move_base
 				geometry_msgs::PoseStamped next_goal;
 				
 				next_goal.header.stamp = ros::Time::now();
 				next_goal.header.frame_id = "map";
-				next_goal.pose = result_pose;
+				next_goal.pose = result_pose;				
+							
+				ROS_INFO("Sending Rosie to (x,y,z): (%f, %f, %f)", result_pose.position.x, result_pose.position.y, result_pose.position.z);
+				
+				bool reachable = pose_is_reachable(next_goal);
+				
+				// if not successful -> try again
+				if(!reachable) {
+					ROS_ERROR("Pose not reachable -> try again!");
+					goto try_again;
+				}
 				
 				move_base_msgs::MoveBaseAction next_goal_action;
 				next_goal_action.action_goal.goal.target_pose = next_goal;
@@ -331,6 +295,33 @@ void StaticPlanner::check_path()
     
     ROS_INFO("Finished checking path");
 }
+
+bool StaticPlanner::pose_is_reachable(const geometry_msgs::PoseStamped &check_pose)
+{
+	geometry_msgs::PoseStamped tmsg;
+
+	ros::Time now = ros::Time::now();
+	transform.waitForTransform("/map", "/base_link", now, ros::Duration(3.0));
+	transform.transformPose("/map", check_pose, tmsg);
+	geometry_msgs::PoseStamped start = tmsg, tstart;
+	start.header.frame_id = "/base_link";
+	start.pose.position.x = 0;
+	start.pose.position.y = 0;
+	start.pose.position.z = 0;
+	transform.transformPose( "/map", start, tstart );
+	
+	std::vector<geometry_msgs::PoseStamped> global_path;
+	bool plan_found_in_global = navfn_check_global.makePlan(tstart, tmsg, global_path);
+	if(!plan_found_in_global) {
+		ROS_WARN("Goal not reachable");
+		return false;
+	} else {
+		ROS_WARN("Goal reachable");
+		return true;
+	}
+};
+
+
 
 void StaticPlanner::execute_cb(const scitos_2d_navigation::UnleashStaticPlannerGoalConstPtr &goal)
 {

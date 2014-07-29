@@ -30,10 +30,10 @@ void UnleashStaticPlannerRecovery::initialize(std::string name, tf::TransformLis
 
 		ROS_INFO("Waiting for static_planner action server to start.");
 		
-		unleash_client->waitForServer();
+		//~ unleash_client->waitForServer();
 		
         initialized_ = true;
-        
+        ROS_INFO("Initialized recovery_mode plugin to unleash static_planner");
     }
     else {
         ROS_ERROR("You should not call initialize twice on this object, doing nothing");

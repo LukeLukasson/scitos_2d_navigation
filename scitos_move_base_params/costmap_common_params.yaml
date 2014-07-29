@@ -15,7 +15,7 @@ no_go_layer:
   map_topic: /no_go_map
 
 inflation_layer:
-  inflation_radius: 0.8
+  inflation_radius: 1.0
   cost_scaling_factor: 10.0
     
 
@@ -61,7 +61,7 @@ smart_obstacle_layer:
   track_unknown_space: true
   
   #    Overwrite:   0
-  #    Maximum:     1       (here better since the update rectangular is still squared)
+  #    Maximum:     1       (smarter since we clear everything every iteration but want to keep obstacles in the master costmap)
   combination_method: 1
 
   #~ only_current_measurements: true
@@ -85,7 +85,7 @@ dynamic_layer:
     
   # flags
   debug_flag: false
-  init_static_map_blank: true
+  init_static_map_with_map: true
   publish_fine_map: true
   publish_block_map: true
   publish_input_map: true

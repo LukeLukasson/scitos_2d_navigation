@@ -59,11 +59,11 @@ generate_dynamic_reconfigure_options(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-#~ generate_messages(
-    #~ DEPENDENCIES
-    #~ std_msgs  # Or other packages containing msgs
-    #~ strands_perception_msgs
-#~ )
+# generate_messages(
+#     DEPENDENCIES
+#     std_msgs  # Or other packages containing msgs
+#     strands_perception_msgs
+# )
 
 ###################################
 ## catkin specific configuration ##
@@ -104,17 +104,17 @@ add_library(static_planner src/static_planner.cpp)
 add_executable(subsample_cloud src/subsample_cloud.cpp)
 add_executable(remove_edges_cloud src/remove_edges_cloud.cpp)
 add_executable(mirror_floor_points src/mirror_floor_points.cpp)
-#~ add_executable(static_planner src/static_planner.cpp)
+# add_executable(static_planner src/static_planner.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(scitos_2d_navigation_node scitos_2d_navigation_generate_messages_cpp)
+#add_dependencies(scitos_2d_navigation_node scitos_2d_navigation_generate_messages_cpp)
+add_dependencies(dynamic_layer ${PROJECT_NAME}_gencfg) # please do not ask me why... black magic maybe?
 add_dependencies(dynamic_layer plugins/dynamic_layer.cpp)
-add_dependencies(dynamic_layer dynamic_layer_gencfg) # please do not ask me why... black magic maybe?
+add_dependencies(overwrite_layer ${PROJECT_NAME}_gencfg) # please do not ask me why... black magic maybe?
 add_dependencies(overwrite_layer plugins/overwrite_layer.cpp)
-add_dependencies(overwrite_layer overwrite_layer_gencfg) # please do not ask me why... black magic maybe?
+add_dependencies(smart_obstacle_layer ${PROJECT_NAME}_gencfg) # please do not ask me why... black magic maybe?
 add_dependencies(smart_obstacle_layer plugins/smart_obstacle_layer.cpp)
-add_dependencies(smart_obstacle_layer smart_obstacle_layer_gencfg) # please do not ask me why... black magic maybe?
 add_dependencies(static_planner src/static_planner.cpp)
 add_dependencies(static_planner strands_perception_msgs_generate_messages_cpp)
 

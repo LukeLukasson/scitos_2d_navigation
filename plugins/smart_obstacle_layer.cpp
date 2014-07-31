@@ -196,6 +196,12 @@ void SmartObstacleLayer::setupDynamicReconfigure(ros::NodeHandle& nh)
     dsrv_->setCallback(cb);
 }
 
+SmartObstacleLayer::~SmartObstacleLayer()
+{
+    if(dsrv_)
+            delete dsrv_;
+}
+
 void SmartObstacleLayer::reconfigureCB(scitos_2d_navigation::smart_obstacle_layer_paramsConfig &config, uint32_t level)
 {
     enabled_ = config.enabled;
@@ -392,11 +398,15 @@ void SmartObstacleLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min
     // before we merge this obstacle layer into the master_grid.
     footprint_layer_.updateCosts(*this, min_i, min_j, max_i, max_j);
 
-    if(combination_method_==0)
+    if(combination_method_==0) {
+        //~ ROS_INFO("Update with Overwrite");
         updateWithOverwrite(master_grid, min_i, min_j, max_i, max_j);
-    else
+    } else {
+        //~ ROS_INFO("Update with Maximum");
         updateWithMax(master_grid, min_i, min_j, max_i, max_j);
+    }
 }
+
 
 void SmartObstacleLayer::addStaticObservation(costmap_2d::Observation& obs, bool marking, bool clearing)
 {
@@ -546,7 +556,7 @@ void SmartObstacleLayer::updateRaytraceBounds(double ox, double oy, double wx, d
 double* max_x, double* max_y)
 {
     double dx = wx-ox, dy = wy-oy;
-    double full_distance = ::hypot(dx, dy);
+    double full_distance = hypot(dx, dy);
     double scale = std::min(1.0, range / full_distance);
     double ex = ox + dx * scale, ey = oy + dy * scale;
     touch(ex, ey, min_x, min_y, max_x, max_y);

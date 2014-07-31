@@ -106,7 +106,7 @@ private:
     bool flag_init_fine;
     bool flag_init_block;
     bool flag_init_input;
-    bool init_fine_blank;
+    bool init_fine_with_map;
     bool publish_fine_map;
     bool publish_block_map;    
     // debugging flags

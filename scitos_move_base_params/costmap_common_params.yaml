@@ -74,7 +74,7 @@ dynamic_layer:
   #    low2:     how fast shall we introduce a new object into the static map?
     
   stat_low: 0.3
-  stat_low2: 0.5001
+  stat_low2: 0.507
   stat_high: 0.6
   dyn_low: 0.2
   dyn_high: 0.999999

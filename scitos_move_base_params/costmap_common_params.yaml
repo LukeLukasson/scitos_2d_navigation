@@ -64,7 +64,7 @@ smart_obstacle_layer:
   #    Maximum:     1       (smarter since we clear everything every iteration but want to keep obstacles in the master costmap)
   combination_method: 1
 
-  #~ only_current_measurements: true
+  only_current_measurements: true
 
 
 dynamic_layer:

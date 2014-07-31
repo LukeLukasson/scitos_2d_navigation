@@ -22,7 +22,7 @@ void SmartObstacleLayer::onInitialize()
     rolling_window_ = layered_costmap_->isRolling();
     
     // smart part
-    nh.param("only_current_measurements", only_current_measurements_, true);
+	nh.param("only_current_measurements", only_current_measurements_, true);
 
     bool track_unknown_space;
     nh.param("track_unknown_space", track_unknown_space, layered_costmap_->isTrackingUnknown());

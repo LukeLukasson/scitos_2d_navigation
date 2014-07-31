@@ -290,6 +290,10 @@ void StaticPlanner::check_path()
 					} else {
 						ROS_INFO("Orignal goal still not reachable");
 						ROS_WARN("Move bitch! -> Activating Rambo-Mode");
+
+						sound_play::Sound ask_sound = sound_client.voiceSound("Hello dynamic obstacle. Please move out of the way.");
+						ask_sound.play();
+
 						ROS_ERROR("10");
 						ros::Duration(1).sleep();
 						ROS_ERROR("9");
@@ -311,6 +315,8 @@ void StaticPlanner::check_path()
 						ROS_ERROR("1");
 						ros::Duration(1).sleep();
 						
+						ros::Duration(10).sleep();
+						
 						// try one last time
 						ROS_INFO("We try one last time...");
 						move_base_msgs::MoveBaseAction original_goal_action;
@@ -318,14 +324,25 @@ void StaticPlanner::check_path()
 						move_base_client->sendGoalAndWait(original_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
 						// if reached the whole recovery was a success and we can exit
 						if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+							sound_play::Sound thanks_sound = sound_client.voiceSound("Thanks for helping me.");
+							thanks_sound.play();
+							
 							block_for_block = false;
 							check_path_is_active = false;
 							ROS_INFO("Successfully recovered! Good job Rosie!");
+							
 							return;
 							
 						} else {
 							ROS_ERROR("Rosie is designed to help dynamic obstacles, not to harm them. The algorithm therefore aborts.");
 							// don't free up nothing -> recovery failed								
+
+							sound_play::Sound failed_sound = sound_client.voiceSound("I failed to reach the goal. Autodestruction in 5 4 3 2 1");
+							failed_sound.play();
+							
+							block_for_block = false;
+							check_path_is_active = false;
+
 							return;
 						}
 					}

@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
                     nav_core
                     pluginlib
                     actionlib_msgs
+                    sound_play
 )
 
 ## System dependencies are found with CMake's conventions

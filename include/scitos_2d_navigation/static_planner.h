@@ -22,6 +22,9 @@
 #include <move_base_msgs/MoveBaseAction.h>
 #include <scitos_2d_navigation/UnleashStaticPlannerAction.h>
 
+// play some sound
+#include <sound_play/sound_play.h>
+
 // class header
 namespace scitos_2d_navigation
 {
@@ -98,6 +101,9 @@ protected:
     // clients
     actionlib::SimpleActionClient<perceive_tabletop_action::FindGoalPoseAction> *pose_client;
     actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> *move_base_client;
+    
+    // sound client
+    sound_play::SoundClient sound_client;
     
     // server
     actionlib::SimpleActionServer<scitos_2d_navigation::UnleashStaticPlannerAction> unleash_server;

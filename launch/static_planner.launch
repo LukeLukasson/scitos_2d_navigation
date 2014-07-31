@@ -7,4 +7,13 @@
 		<rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/global_costmap_copy_params.yaml" command="load"/>
 		<rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/dwa_planner_ros.yaml" command="load" />
     </node>
+
+    
+
+    <node pkg="perceive_tabletop_action" type="simple_view_planning.py" name="simple_view_planning" respawn="false" output="screen" clear_params="true"></node>
+
+
+
+  <include file="$(find perceive_tabletop_action)/launch/simple_view_planning.launch"></include>
+
 </launch>

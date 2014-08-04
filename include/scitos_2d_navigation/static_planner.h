@@ -75,7 +75,6 @@ protected:
     // flags
     bool debug;
     bool block_for_block;
-    bool finished_process;
     bool got_map;
     bool got_goal;
     bool check_path_is_active;

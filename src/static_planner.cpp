@@ -18,7 +18,6 @@ StaticPlanner::StaticPlanner(std::string name) : unleash_server(nh, name, boost:
 		// flags
 		debug = true;
 		block_for_block = false;
-		finished_process = false;
 		got_map = false;
 		got_goal = false;
 		check_path_is_active = false;
@@ -99,7 +98,7 @@ void StaticPlanner::goal_cb(const geometry_msgs::PoseStampedConstPtr &msg)
 
 void StaticPlanner::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
 {
-    if(debug && !got_map)
+    if(!got_map)
     ROS_WARN("+++ Received dynamic map");
     
     if(!got_map) {        
@@ -194,6 +193,9 @@ void StaticPlanner::check_path()
 			goal.polygon.points[3].y = map_origin_y + j_xxl*map_res;
 			goal.polygon.points[3].z = 0;
 			
+			
+			int try_again_abort_counter = 0;
+			int try_again_abort_counter_max = 20;
 			try_again:
 			
 			// send it to the client
@@ -206,7 +208,20 @@ void StaticPlanner::check_path()
 			bool finished_before_timeout = pose_client->waitForResult(ros::Duration(240.0));
 			
 			if(finished_before_timeout) {
-				
+
+				if(pose_client->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+					ROS_ERROR("No valid viewcone found -> try again!");
+					if(try_again_abort_counter <= try_again_abort_counter_max) {
+						try_again_abort_counter++;
+						goto try_again;
+					} else {
+						ROS_ERROR_STREAM("No valid viewcone found after " << try_again_abort_counter << " attempts -> Abort Recovery");
+						block_for_block = false;
+						check_path_is_active = false;
+						return;
+					}
+				}					
+					
 				actionlib::SimpleClientGoalState state = pose_client->getState();
 				ROS_INFO("Find goal pose finished: %s",state.toString().c_str());
 				result_pose = pose_client->getResult()->goal_pose;
@@ -225,7 +240,15 @@ void StaticPlanner::check_path()
 				// if not successful -> try again
 				if(!reachable) {
 					ROS_ERROR("Pose not reachable -> try again!");
-					goto try_again;
+					if(try_again_abort_counter <= try_again_abort_counter_max) {
+						try_again_abort_counter++;
+						goto try_again;
+					} else {
+						ROS_ERROR_STREAM("Pose not reachable after " << try_again_abort_counter << " attempts");
+						block_for_block = false;
+						check_path_is_active = false;
+						return;
+					}
 				}
 				
 				move_base_msgs::MoveBaseAction next_goal_action;
@@ -264,10 +287,6 @@ void StaticPlanner::check_path()
 						
 						ROS_INFO("Send Rosie to the original goal!");
 						
-						// free it up for recovery behavior... smart idea? I hope so... Needs testing though
-						check_path_is_active = false;
-						block_for_block = false;
-						
 						// send it to move_base
 						move_base_msgs::MoveBaseAction original_goal_action;
 						original_goal_action.action_goal.goal.target_pose = original_goal;
@@ -289,57 +308,58 @@ void StaticPlanner::check_path()
 						}
 					} else {
 						ROS_INFO("Orignal goal still not reachable");
-						ROS_WARN("Move bitch! -> Activating Rambo-Mode");
-
+						
 						sound_play::Sound ask_sound = sound_client.voiceSound("Hello dynamic obstacle. Please move out of the way.");
 						ask_sound.play();
-
-						ROS_ERROR("10");
-						ros::Duration(1).sleep();
-						ROS_ERROR("9");
-						ros::Duration(1).sleep();
-						ROS_ERROR("8");
-						ros::Duration(1).sleep();
-						ROS_ERROR("7");
-						ros::Duration(1).sleep();
-						ROS_ERROR("6");
-						ros::Duration(1).sleep();
-						ROS_ERROR("5");
-						ros::Duration(1).sleep();
-						ROS_ERROR("4");
-						ros::Duration(1).sleep();
-						ROS_ERROR("3");
-						ros::Duration(1).sleep();
-						ROS_ERROR("2");
-						ros::Duration(1).sleep();
-						ROS_ERROR("1");
-						ros::Duration(1).sleep();
+	
+						bool final_reachable = pose_is_reachable(original_goal);
 						
-						ros::Duration(10).sleep();
+						// try for 20 seconds -> then give up
+						int abort_counter = 0;
 						
-						// try one last time
-						ROS_INFO("We try one last time...");
-						move_base_msgs::MoveBaseAction original_goal_action;
-						original_goal_action.action_goal.goal.target_pose = original_goal;
-						move_base_client->sendGoalAndWait(original_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
-						// if reached the whole recovery was a success and we can exit
-						if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+						while(!final_reachable && abort_counter <= 40) {
+							ros::Duration(0.5).sleep();
+							abort_counter++;
+							final_reachable = pose_is_reachable(original_goal);
+						}
+						
+						if(final_reachable) {// try one last time
+							
 							sound_play::Sound thanks_sound = sound_client.voiceSound("Thanks for helping me.");
 							thanks_sound.play();
 							
-							block_for_block = false;
-							check_path_is_active = false;
-							ROS_INFO("Successfully recovered! Good job Rosie!");
+							ROS_INFO("We try one last time...");
+							move_base_msgs::MoveBaseAction original_goal_action;
+							original_goal_action.action_goal.goal.target_pose = original_goal;
+							move_base_client->sendGoalAndWait(original_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
+							// if reached the whole recovery was a success and we can exit
+							if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
 							
-							return;
+								block_for_block = false;
+								check_path_is_active = false;
+								ROS_INFO("Successfully recovered! Good job Rosie!");
 							
+								return;
+							
+							} else {
+								ROS_ERROR("Rosie failed after finding a valid path!");
+								// don't free up nothing -> recovery failed								
+
+								sound_play::Sound failed_sound = sound_client.voiceSound("I failed to reach the goal. Autodestruction in 5 4 3 2 1");
+								failed_sound.play();
+							
+								block_for_block = false;
+								check_path_is_active = false;
+
+								return;
+							}
 						} else {
 							ROS_ERROR("Rosie is designed to help dynamic obstacles, not to harm them. The algorithm therefore aborts.");
 							// don't free up nothing -> recovery failed								
 
 							sound_play::Sound failed_sound = sound_client.voiceSound("I failed to reach the goal. Autodestruction in 5 4 3 2 1");
 							failed_sound.play();
-							
+						
 							block_for_block = false;
 							check_path_is_active = false;
 

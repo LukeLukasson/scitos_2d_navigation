@@ -235,11 +235,12 @@ void StaticPlanner::check_path()
 							
 				ROS_INFO("Sending Rosie to (x,y,z): (%f, %f, %f)", result_pose.position.x, result_pose.position.y, result_pose.position.z);
 				
+				ROS_INFO("Checking if obervation pose reachable:");
 				bool reachable = pose_is_reachable(next_goal);
 				
 				// if not successful -> try again
 				if(!reachable) {
-					ROS_ERROR("Pose not reachable -> try again!");
+					ROS_ERROR("Pose not reachable -> try another pose!");
 					if(try_again_abort_counter <= try_again_abort_counter_max) {
 						try_again_abort_counter++;
 						goto try_again;
@@ -339,13 +340,15 @@ void StaticPlanner::check_path()
 								check_path_is_active = false;
 								ROS_INFO("Successfully recovered! Good job Rosie!");
 							
+								sound_play::Sound success_sound = sound_client.voiceSound("I made it! Boooooyyaaaaaah!");
+								success_sound.play();
 								return;
 							
 							} else {
-								ROS_ERROR("Rosie failed after finding a valid path!");
+								ROS_ERROR("Original Pose now reachable but Rosie still failed to reach it.");
 								// don't free up nothing -> recovery failed								
 
-								sound_play::Sound failed_sound = sound_client.voiceSound("I failed to reach the goal. Autodestruction in 5 4 3 2 1");
+								sound_play::Sound failed_sound = sound_client.voiceSound("I failed even though I could reach my original goal.");
 								failed_sound.play();
 							
 								block_for_block = false;
@@ -354,12 +357,12 @@ void StaticPlanner::check_path()
 								return;
 							}
 						} else {
-							ROS_ERROR("Rosie is designed to help dynamic obstacles, not to harm them. The algorithm therefore aborts.");
+							ROS_ERROR("Dynamic obstacle did not move out of the way! How rude.");
 							// don't free up nothing -> recovery failed								
 
-							sound_play::Sound failed_sound = sound_client.voiceSound("I failed to reach the goal. Autodestruction in 5 4 3 2 1");
+							sound_play::Sound failed_sound = sound_client.voiceSound("If you dont want to move then I dont want to move either.");
 							failed_sound.play();
-						
+							
 							block_for_block = false;
 							check_path_is_active = false;
 
@@ -389,10 +392,11 @@ void StaticPlanner::check_path()
 		}
     }
     
-    // free up cb for new goals again
+    // free up cb for new goals again.
+    block_for_block = false;
     check_path_is_active = false;
     
-    ROS_INFO("Finished check_path()");
+     ROS_INFO("Finished check_path()");
 }
 
 bool StaticPlanner::pose_is_reachable(const geometry_msgs::PoseStamped &check_pose)

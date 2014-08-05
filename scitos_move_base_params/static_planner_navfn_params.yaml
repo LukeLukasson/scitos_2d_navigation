@@ -1,0 +1,5 @@
+global_costmap_copy:
+    allow_unknown: false
+        
+static_costmap:
+    allow_unknown: false

@@ -25,5 +25,5 @@
 </launch>
 
 <!--
- , {name: "conservative_reset", type: "clear_costmap_recovery/ClearCostmapRecovery"}, {name: "clear_voxels", type: "clear_voxels_recovery/ClearVoxelsRecovery"}, {name: "aggressive_reset", type: "clear_costmap_recovery/ClearCostmapRecovery"}] 
+ {name: "conservative_reset", type: "clear_costmap_recovery/ClearCostmapRecovery"} , {name: "conservative_reset", type: "clear_costmap_recovery/ClearCostmapRecovery"}, {name: "clear_voxels", type: "clear_voxels_recovery/ClearVoxelsRecovery"}, {name: "aggressive_reset", type: "clear_costmap_recovery/ClearCostmapRecovery"}] 
  -->

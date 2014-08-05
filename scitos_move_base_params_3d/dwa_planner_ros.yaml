@@ -28,7 +28,7 @@ DWAPlannerROS:
 
 #cost =  path_distance_bias * (distance to path from the endpoint of the trajectory in meters)  + goal_distance_bias * (distance to local goal from the endpoint of the trajectory in meters)  + occdist_scale * (maximum obstacle cost along the trajectory in obstacle cost (0-254))
   path_distance_bias: 5.0 #default:32
-  goal_distance_bias: 9.0 #default:24
+  goal_distance_bias: 24.0 #default:24 was9.0
   occdist_scale: 0.01 #default:0.01
 
   

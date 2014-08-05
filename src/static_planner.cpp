@@ -143,7 +143,8 @@ void StaticPlanner::check_path()
 	check_path_is_active = true;
 	
 	ROS_WARN("+++ Checking path");
-    
+	
+   
     for(unsigned int i = 0; i < path.size(); i++) {
         //~ ROS_INFO("path(%d): (%f,%f)", i, path[i].pose.position.x, path[i].pose.position.y);
         
@@ -163,242 +164,151 @@ void StaticPlanner::check_path()
 		
 		//~ ROS_INFO_STREAM("value_map: " << value_map << " - block_for_block: " << block_for_block);
 		// check if there is a dynamic obstacle (maybe more agressive over 51?)
-		if(value_map > 90 && !block_for_block) {
-			// block for the found block
-			block_for_block = true;
+		if(value_map > 90) {
+		
+			// update critical pose
+			crit_dyn_obs.pose.position.x = map_x;
+			crit_dyn_obs.pose.position.y = map_y;
+			crit_dyn_obs.pose.orientation = tf::createQuaternionMsgFromYaw(0.0);
 			
 			// warning and map published
 			ROS_ERROR_STREAM("Obstacle at (" << map_x+map_origin_x << ", " << map_y+map_origin_y << ") -- Block: (" << i_xxl << ", " << j_xxl << ")  --  Value: " << value_map);
 			tableMap->setCost(i_xxl, j_xxl, 200);
 			pubTableMap->publishCostmap();
 			
-			
 			// create message to send to simple_view_planner
-			perceive_tabletop_action::FindGoalPoseGoal goal;
+			perceive_tabletop_action::FindGoalPoseGoal observation_polygon;
 
 			// put table into polygon
-			goal.polygon.points.resize(4);
+			observation_polygon.polygon.points.resize(4);
 			
 			// 4 points defining the table polygon
-			goal.polygon.points[0].x = map_origin_x + i_xxl*map_res;
-			goal.polygon.points[0].y = map_origin_y + j_xxl*map_res;
-			goal.polygon.points[0].z = 0;
-			goal.polygon.points[1].x = map_origin_x + i_xxl*map_res;
-			goal.polygon.points[1].y = map_origin_y + (j_xxl+1)*map_res;
-			goal.polygon.points[1].z = 0;
-			goal.polygon.points[2].x = map_origin_x + (i_xxl+1)*map_res;
-			goal.polygon.points[2].y = map_origin_y + (j_xxl+1)*map_res;
-			goal.polygon.points[2].z = 0;
-			goal.polygon.points[3].x = map_origin_x + (i_xxl+1)*map_res;
-			goal.polygon.points[3].y = map_origin_y + j_xxl*map_res;
-			goal.polygon.points[3].z = 0;
+			observation_polygon.polygon.points[0].x = map_origin_x + i_xxl*map_res;
+			observation_polygon.polygon.points[0].y = map_origin_y + j_xxl*map_res;
+			observation_polygon.polygon.points[0].z = 0;
+			observation_polygon.polygon.points[1].x = map_origin_x + i_xxl*map_res;
+			observation_polygon.polygon.points[1].y = map_origin_y + (j_xxl+1)*map_res;
+			observation_polygon.polygon.points[1].z = 0;
+			observation_polygon.polygon.points[2].x = map_origin_x + (i_xxl+1)*map_res;
+			observation_polygon.polygon.points[2].y = map_origin_y + (j_xxl+1)*map_res;
+			observation_polygon.polygon.points[2].z = 0;
+			observation_polygon.polygon.points[3].x = map_origin_x + (i_xxl+1)*map_res;
+			observation_polygon.polygon.points[3].y = map_origin_y + j_xxl*map_res;
+			observation_polygon.polygon.points[3].z = 0;
+			
+			// create pose for checking if in sight of robot
+			crit_dyn_obs.header.frame_id = "map";
+			crit_dyn_obs.pose.position.x = pose_x;
+			crit_dyn_obs.pose.position.y = pose_y;
+			crit_dyn_obs.pose.orientation = tf::createQuaternionMsgFromYaw(0.0);
 			
 			
-			int try_again_abort_counter = 0;
-			int try_again_abort_counter_max = 20;
-			try_again:
-			
-			// send it to the client
-			pose_client->sendGoal(goal);
-			
-			// initialize result
-			geometry_msgs::Pose result_pose;
-
-			// wait for the action to return
-			bool finished_before_timeout = pose_client->waitForResult(ros::Duration(240.0));
-			
-			if(finished_before_timeout) {
-
-				if(pose_client->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
-					ROS_ERROR("No valid viewcone found -> try again!");
-					if(try_again_abort_counter <= try_again_abort_counter_max) {
-						try_again_abort_counter++;
-						goto try_again;
+			/* 
+			 * start the logic of the recovery behavior
+			 */
+			 
+			// does Rosie need to move?
+			if(check_if_in_sight(crit_dyn_obs)) {
+				// we do not have to move:
+				// check if original goal reachable
+				if(pose_is_reachable(original_goal)) {
+					// continue journey of Rosie and check if succeeded
+					if(send_rosie_to_original_goal()) {
+						// no recovery needed
+						ROS_INFO("Recovery succeeded without interaction");
+						sound_play::Sound success_sound = sound_client.voiceSound("Who needs this shitty algorithm anyway?");
+						success_sound.play();					
 					} else {
-						ROS_ERROR_STREAM("No valid viewcone found after " << try_again_abort_counter << " attempts -> Abort Recovery");
-						block_for_block = false;
-						check_path_is_active = false;
-						return;
+						// recovery failed
+						ROS_WARN("Recovery failed even though original goal would be reachable");
+						sound_play::Sound failed_sound = sound_client.voiceSound("I have a valid path but cannot reach the original goal.");
+						failed_sound.play();
 					}
-				}					
-					
-				actionlib::SimpleClientGoalState state = pose_client->getState();
-				ROS_INFO("Find goal pose finished: %s",state.toString().c_str());
-				result_pose = pose_client->getResult()->goal_pose;
-				
-				// mold everything to send it to move_base
-				geometry_msgs::PoseStamped next_goal;
-				
-				next_goal.header.stamp = ros::Time::now();
-				next_goal.header.frame_id = "map";
-				next_goal.pose = result_pose;				
-							
-				ROS_INFO("Sending Rosie to (x,y,z): (%f, %f, %f)", result_pose.position.x, result_pose.position.y, result_pose.position.z);
-				
-				ROS_INFO("Checking if obervation pose reachable:");
-				bool reachable = pose_is_reachable(next_goal);
-				
-				// if not successful -> try again
-				if(!reachable) {
-					ROS_ERROR("Pose not reachable -> try another pose!");
-					if(try_again_abort_counter <= try_again_abort_counter_max) {
-						try_again_abort_counter++;
-						goto try_again;
-					} else {
-						ROS_ERROR_STREAM("Pose not reachable after " << try_again_abort_counter << " attempts");
-						block_for_block = false;
-						check_path_is_active = false;
-						return;
-					}
-				}
-				
-				move_base_msgs::MoveBaseAction next_goal_action;
-				next_goal_action.action_goal.goal.target_pose = next_goal;
-				
-				ROS_INFO("Are we connected?");
-				//~ actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-				bool state_move_base_connected = move_base_client->isServerConnected();
-				ROS_INFO_STREAM("Connected: " << state_move_base_connected);
-				//~ ROS_INFO("Situation before cancelling");
-				//~ actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-				//~ ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
-				//~ 
-				// send it to move_base
-				ROS_INFO("Cancel all goals");
-				move_base_client->cancelAllGoals();
-				//~ move_base_client->waitForResult(ros::Duration(10.0));
-				//~ state_move_base = move_base_client->getState();
-				//~ ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
-				
-				ROS_INFO("Send new goal");
-				move_base_client->sendGoalAndWait(next_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
-				actionlib::SimpleClientGoalState state_move_base = move_base_client->getState();
-				ROS_INFO("Move base client: %s", state_move_base.toString().c_str());
-				move_base_client->waitForResult(ros::Duration(120.0));
-				
-				if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-					ROS_INFO("Moved into position!");
-					
-					// try to interact or move to the original goal
-					ROS_INFO("Checking if oringal pose reachable:");
-					bool reachable = pose_is_reachable(original_goal);
-					
-					// if reachable go there again
-					if(reachable) {
-						
-						ROS_INFO("Send Rosie to the original goal!");
-						
-						// send it to move_base
-						move_base_msgs::MoveBaseAction original_goal_action;
-						original_goal_action.action_goal.goal.target_pose = original_goal;
-						move_base_client->sendGoalAndWait(original_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
-
-						// if reached the whole recovery was a success and we can exit
-						if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-							block_for_block = false;
-							check_path_is_active = false;
-							ROS_INFO("Successfully recovered! Good job Rosie!");
-							return;
-							
-						} else { // otherwise we try to interact with the dynamic object
-						
-							ROS_WARN("Pose reachable but not successfully reached -> Abort");
-							block_for_block = false;
-							check_path_is_active = false;
-							return;							
+				} else {
+					// original pose not reachable. proably due to the dynamic obstacle in sight
+					// interact with obstacle and check if succeeded
+					if(interact_and_check()) {
+						// dynamic obstacle moved -> Go to original target
+						sound_play::Sound thanks_sound = sound_client.voiceSound("Thanks for helping me.");
+						thanks_sound.play();
+						if(send_rosie_to_original_goal()) {
+							// recovery successful
+							ROS_INFO("Recovery succeeded with interaction");
+							sound_play::Sound success_sound = sound_client.voiceSound("I made it! Booooyyaaaah!");
+							success_sound.play();
+						} else {
+							// recovery failed
+							ROS_WARN("Recovery failed after interaction");
+							sound_play::Sound failed_sound = sound_client.voiceSound("I have a valid path but cannot reach the original goal.");
+							failed_sound.play();
 						}
 					} else {
-						ROS_INFO("Orignal goal still not reachable");
-						
-						sound_play::Sound ask_sound = sound_client.voiceSound("Hello dynamic obstacle. Please move out of the way.");
-						ask_sound.play();
-	
-						bool final_reachable = pose_is_reachable(original_goal);
-						
-						// try for 20 seconds -> then give up
-						int abort_counter = 0;
-						
-						while(!final_reachable && abort_counter <= 40) {
-							ros::Duration(0.5).sleep();
-							abort_counter++;
-							final_reachable = pose_is_reachable(original_goal);
+						// dynamic obstacle did not move
+						ROS_WARN("Recovery failed since the dynamic obstacle did not move out of the way");
+						sound_play::Sound failed_sound = sound_client.voiceSound("If you dont want to move then I do not want to move either.");
+						failed_sound.play();					
+					}
+				}	
+			} else {
+				// we do need to move
+				if(run_mobile_reobservation(observation_polygon)) {
+					// successfully moved into reobservation pose -> did it solve the problem?
+					if(pose_is_reachable(original_goal)) {
+						// continue journey of Rosie and check if succeeded
+						if(send_rosie_to_original_goal()) {
+							// no recovery needed
+							ROS_INFO("Recovery succeeded without interaction after reobserving obstacle");
+							sound_play::Sound success_sound = sound_client.voiceSound("No interaction needed. Stupid humans.");
+							success_sound.play();
+						} else {
+							// recovery failed
+							ROS_WARN("Recovery failed even though original goal would be reachable after reobserving  obstacle");
+							sound_play::Sound failed_sound = sound_client.voiceSound("I have a valid path but cannot reach the original goal.");
+							failed_sound.play();
 						}
-						
-						if(final_reachable) {// try one last time
-							
+					} else {
+						// original pose not reachable. proably due to the dynamic obstacle in sight
+						// interact with obstacle and check if succeeded
+						if(interact_and_check()) {
+							// dynamic obstacle moved -> Go to original target
 							sound_play::Sound thanks_sound = sound_client.voiceSound("Thanks for helping me.");
 							thanks_sound.play();
-							
-							ROS_INFO("We try one last time...");
-							move_base_msgs::MoveBaseAction original_goal_action;
-							original_goal_action.action_goal.goal.target_pose = original_goal;
-							move_base_client->sendGoalAndWait(original_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
-							// if reached the whole recovery was a success and we can exit
-							if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-							
-								block_for_block = false;
-								check_path_is_active = false;
-								ROS_INFO("Successfully recovered! Good job Rosie!");
-							
-								sound_play::Sound success_sound = sound_client.voiceSound("I made it! Boooooyyaaaaaah!");
+							if(send_rosie_to_original_goal()) {
+								// recovery successful
+								ROS_INFO("Recovery succeeded with interaction after reobserving obstacle");
+								sound_play::Sound success_sound = sound_client.voiceSound("I made it! Booooyyaaaah!");
 								success_sound.play();
-								return;
-							
 							} else {
-								ROS_ERROR("Original Pose now reachable but Rosie still failed to reach it.");
-								// don't free up nothing -> recovery failed								
-
-								sound_play::Sound failed_sound = sound_client.voiceSound("I failed even though I could reach my original goal.");
-								failed_sound.play();
-							
-								block_for_block = false;
-								check_path_is_active = false;
-
-								return;
+								// recovery failed
+								ROS_WARN("Recovery failed after interaction after reobserving obstacle");
 							}
 						} else {
-							ROS_ERROR("Dynamic obstacle did not move out of the way! How rude.");
-							// don't free up nothing -> recovery failed								
-
-							sound_play::Sound failed_sound = sound_client.voiceSound("If you dont want to move then I dont want to move either.");
+							// dynamic obstacle did not move
+							ROS_WARN("Recovery failed since the dynamic obstacle did not move out of the way");
+							sound_play::Sound failed_sound = sound_client.voiceSound("If you dont want to move then I do not want to move either.");
 							failed_sound.play();
-							
-							block_for_block = false;
-							check_path_is_active = false;
-
-							return;
 						}
-					}
-					
+					}	
 				} else {
-					ROS_INFO("Move failed!");
+					// cannot reach reobservation pose
+					ROS_WARN("Recovery failed. Could not evaluate or reach a valid pose.");
+					sound_play::Sound failed_sound = sound_client.voiceSound("Cannot find any pose for reobserving the dynamic obstacle.");
+					failed_sound.play();		
 				}
-				
-				// free up block_for_block
-				block_for_block = false;
-
-			} else {
-				ROS_INFO("Find goal pose not finish before the time out.");
 			}
 			
-
-			
-			// save original next goal
-			// send new goal to the nav_goal
-			// check if reached the goal
-			// set back original goal
-			// block_for_block = false
-
+			// break out of the for loop
+			break;
 		}
-    }
-    
-    // free up cb for new goals again.
-    block_for_block = false;
+	}
+
+	// clear check_path() for new execution
     check_path_is_active = false;
     
-     ROS_INFO("Finished check_path()");
-}
-
+    ROS_INFO("Finished recovery behavior static planner");
+};			
+			
+// true: pose reachable on modified copy of global_costmap - false: anything else
 bool StaticPlanner::pose_is_reachable(const geometry_msgs::PoseStamped &check_pose)
 {
 	geometry_msgs::PoseStamped tmsg;
@@ -415,16 +325,129 @@ bool StaticPlanner::pose_is_reachable(const geometry_msgs::PoseStamped &check_po
 	
 	std::vector<geometry_msgs::PoseStamped> global_path;
 	bool plan_found_in_global = navfn_check_global.makePlan(tstart, tmsg, global_path);
-	if(!plan_found_in_global) {
-		ROS_WARN("Pose not reachable");
-		return false;
-	} else {
-		ROS_WARN("Pose reachable");
+	return plan_found_in_global;
+	//~ if(!plan_found_in_global) {
+		//~ ROS_WARN("  Pose not reachable");
+		//~ return false;
+	//~ } else {
+		//~ ROS_INFO("  Pose reachable");
+		//~ return true;
+	//~ }
+};
+
+// true: dynamic point (!) is within rectangle in front of Rosie - false: anything else
+bool StaticPlanner::check_if_in_sight(const geometry_msgs::PoseStamped &target)
+{
+	geometry_msgs::PoseStamped target_rosie;
+	
+	ros::Time now = ros::Time::now();
+	transform.waitForTransform("/map", "/base_link", now, ros::Duration(3.0));
+	transform.transformPose("/base_link", target, target_rosie);
+	
+	double x = target_rosie.pose.position.x;
+	double y = target_rosie.pose.position.y;
+	
+	ROS_INFO_STREAM("  Target as seen from Rosie (x,y): (" << x << "," << y << " - Check if in sight:");
+
+	if((x > 0 && x < 2.0) && (y > -0.35 && y < 0.35)) {
+		ROS_INFO("  Target in sight. Do not need to move");
 		return true;
+	} else {
+		ROS_WARN("  Target not in sight. Do need to reposition");
+		return false;
 	}
 };
 
+// true: reached goal - false: anything else
+bool StaticPlanner::send_rosie_to_original_goal()
+{
+	move_base_msgs::MoveBaseAction original_goal_action;
+	original_goal_action.action_goal.goal.target_pose = original_goal;
+	move_base_client->sendGoalAndWait(original_goal_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
+	if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+		ROS_INFO("  Successfully reached original goal");
+		return true;
+	} else {
+		ROS_WARN("  Could not reach original goal");
+		return false;
+	}
+};
 
+// true: reached goal - false: anyting else
+bool StaticPlanner::send_rosie_to_pose(const geometry_msgs::PoseStamped &pose)
+{
+	move_base_msgs::MoveBaseAction send_rosie_action;
+	send_rosie_action.action_goal.goal.target_pose = pose;
+	move_base_client->sendGoalAndWait(send_rosie_action.action_goal.goal, ros::Duration(120.0), ros::Duration(10.0));
+	if(move_base_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+		ROS_INFO("  Successfully reached desired pose");
+		return true;
+	} else {
+		ROS_WARN("  Could not reach desired pose");
+		return false;
+	}
+		
+};
+
+// true: original goal reachable - false: anything else
+bool StaticPlanner::interact_and_check()
+{
+	// interact with dynamic obstacle
+	ROS_INFO("  Starting interaction...");
+	sound_play::Sound ask_sound = sound_client.voiceSound("Hello dynamic obstacle. Please move out of the way.");
+	ask_sound.play();
+	bool original_goal_reachable = false;
+	// try for 20 seconds -> then give up
+	int abort_counter = 0;
+	while(!original_goal_reachable && abort_counter <= 80) {
+		ros::Duration(0.25).sleep();
+		abort_counter++;
+		original_goal_reachable = pose_is_reachable(original_goal);
+	}
+	return original_goal_reachable;
+};
+
+// true: successfully reached a pose to reobserve the dynamic obstacle - false: any error
+bool StaticPlanner::run_mobile_reobservation(const perceive_tabletop_action::FindGoalPoseGoal &observation_polygon)
+{
+	// upper limits for time to execute
+	ros::Time start_time = ros::Time::now();
+	bool observation_pose_reachable = false;
+	bool reached_observation_pose = false;
+	
+	// init observation pose
+	geometry_msgs::PoseStamped observation_pose;
+	observation_pose.header.frame_id = "map";
+	
+	// outer loop: 30s to move into obervation pose
+	while(!reached_observation_pose && (ros::Time::now()-start_time < ros::Duration(30))) {
+		
+		// inner loop: 10s to find a valid observation pose
+		while(!observation_pose_reachable && (ros::Time::now()-start_time < ros::Duration(10))) {
+			
+			// send polygon to pose evaluation client
+			pose_client->sendGoal(observation_polygon);
+			bool finished_before_timeout = pose_client->waitForResult(ros::Duration(5.0));
+			ROS_INFO_STREAM("  Finished table top part before time out: " << finished_before_timeout);
+			
+			if(pose_client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+				// successuflly found a pose -> is it reachable?
+				observation_pose.pose = pose_client->getResult()->goal_pose;
+				observation_pose.header.stamp = ros::Time::now();
+				observation_pose_reachable = pose_is_reachable(observation_pose);
+				ROS_INFO_STREAM("  Result if (" << observation_pose.pose.position.x << "," << observation_pose.pose.position.y << ") is reachable: " << observation_pose_reachable);
+			}
+		}
+		
+		if(observation_pose_reachable) {
+			// cancel all goals and send Rosie to observation pose
+			// Did that ever fail? Not really...  bool state_move_base_connected = move_base_client->isServerConnected();			
+			reached_observation_pose = send_rosie_to_pose(observation_pose);
+		}
+	}
+	
+	return reached_observation_pose;
+};
 
 void StaticPlanner::execute_cb(const scitos_2d_navigation::UnleashStaticPlannerGoalConstPtr &goal)
 {

@@ -45,12 +45,16 @@ protected:
     void goal_cb(const geometry_msgs::PoseStampedConstPtr &msg);
     void dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn);
     
-    // public check for occupied path
-    void check_path(); // needs tons of exception handles!!!
-    
+    // helper functions
+    void check_path();
+    bool check_if_in_sight(const geometry_msgs::PoseStamped &target);
     bool pose_is_reachable(const geometry_msgs::PoseStamped &check_pose);
-    
-    // ROS handles
+	bool send_rosie_to_original_goal();
+	bool send_rosie_to_pose(const geometry_msgs::PoseStamped &pose);
+	bool interact_and_check();
+	bool run_mobile_reobservation(const perceive_tabletop_action::FindGoalPoseGoal &observation_polygon);
+	
+	// ROS handles
     ros::NodeHandle nh;
     ros::Rate *loop_rate;
     
@@ -91,9 +95,10 @@ protected:
     // make path available globally
     std::vector<geometry_msgs::PoseStamped> path;
     
-    // store original goal
+    // store original goal and critical dynamic obstacle pose
     geometry_msgs::PoseStamped original_goal;
-        
+	geometry_msgs::PoseStamped crit_dyn_obs;
+	
     // counters
     int cb_counter;
     

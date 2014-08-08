@@ -59,18 +59,24 @@ void DynamicLayer::onInitialize()
     flag_init_fine = false;
     flag_init_block = false;
     flag_init_input = false;
+    flag_init_dynLongTerm = false;
+    flag_init_dynLongTermXxl = false;
     nh.param("debug_flag", debug, false);
     nh.param("init_static_map_with_map", init_fine_with_map, false);
     nh.param("publish_fine_map", publish_fine_map, false);
     nh.param("publish_block_map", publish_block_map, false);
     nh.param("publish_input_map", publish_input_map, false);
+    nh.param("publish_dynamic_longTerm_map", publish_dynamic_longTerm_map, false);
+    nh.param("publish_dynamic_longTerm_block_map", publish_dynamic_longTerm_block_map, false);
     
     // assign seq numbers to maps
     staticMap_seq = 1;
     staticMap_xxl_seq = 2;
     dynamicMap_seq = 3;
     dynamicMap_xxl_seq = 4;
-    if(publish_input_map) inputMap_seq = 5;
+    inputMap_seq = 5;
+    dynamicLongTermMap_seq = 6;
+    dynamicLongTermMap_xxl_seq = 7;
     
     // parameters algorithm
     lower_bound = 0.1;                            // free space below 0.1 prob
@@ -103,6 +109,14 @@ void DynamicLayer::onInitialize()
     
     if(debug)
     ROS_INFO_STREAM("Settings -- stat_low: " << stat_low << " -- stat_low2: " << stat_low2 << " -- stat_high: " << stat_high << " -- dyn_low: " << dyn_low << " -- dyn_high: " << dyn_high);
+    
+    // since not handled over dynamic reconfigure it needs to be done here to avoid race conditions
+    if(publish_dynamic_longTerm_map) {
+        dynamicLongTermMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/dynamic_map_long_term", 10);
+    }
+    if(publish_dynamic_longTerm_block_map) {
+        dynamicLongTermMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/dynamic_map_long_term_xxl", 10);
+    }
     
 }
 
@@ -207,17 +221,65 @@ void DynamicLayer::initInputMap()
     inputMap.header.seq = inputMap_seq;
 }
 
+// initialize dynamic long term map
+void DynamicLayer::initDynamicLongTermMap()
+{
+    if(debug) ROS_WARN("+++ Initializing dynamic long term map");
+    
+    // handeling nav_msgs/MapMetaData
+    dynamicLongTermMap.info.resolution = master_grid_resolution;                                                                // float32
+    dynamicLongTermMap.info.width = width;                                                     // uint32
+    dynamicLongTermMap.info.height = height;                                                    // uint32
+    dynamicLongTermMap.info.origin.position.x = master_grid_origin_x;		//std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
+    dynamicLongTermMap.info.origin.position.y = master_grid_origin_y;		//std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
+    dynamicLongTermMap.info.origin.orientation.w = master_grid_orientation;                                                     // same orientation as /map
+    int p[n_cells];
+    std::vector<signed char> a(p, p+n_cells);
+    dynamicLongTermMap.data = a;
+    
+    // get initializer
+    dynamicLongTermMap.header.seq = dynamicLongTermMap_seq;
+}
+
+// initialize dynamic long term map xxl
+void DynamicLayer::initDynamicLongTermMapXxl()
+{
+    if(debug) ROS_WARN("+++ Initializing dynamic long term map xxl");
+    
+    // handeling nav_msgs/MapMetaData
+    dynamicLongTermMap_xxl.info.resolution = resolution_xxl;                                                                // float32
+    dynamicLongTermMap_xxl.info.width = width_xxl;                                                     // uint32
+    dynamicLongTermMap_xxl.info.height = height_xxl;                                                    // uint32
+    dynamicLongTermMap_xxl.info.origin.position.x = master_grid_origin_x;		//std::max(-(max_cells_x/2 * master_grid_resolution), master_grid_origin_x);         // same origin as /map
+    dynamicLongTermMap_xxl.info.origin.position.y = master_grid_origin_y;		//std::max(-(max_cells_y/2 * master_grid_resolution), master_grid_origin_y);         // same origin as /map
+    dynamicLongTermMap_xxl.info.origin.orientation.w = master_grid_orientation;                                                     // same orientation as /map
+    int p[n_cells_xxl];
+    std::vector<signed char> a(p, p+n_cells_xxl);
+    dynamicLongTermMap_xxl.data = a;
+    
+    // get initializer
+    dynamicLongTermMap_xxl.header.seq = dynamicLongTermMap_xxl_seq;
+}
+
 // push values of matrix to OccupancyGrid of map
 void DynamicLayer::publishMap(nav_msgs::OccupancyGrid &map, Eigen::MatrixXf &matrix, int cells)
 {
-   
-    // how many cells in map? -> n_cells
-    // cast <float> matrix to <int> matrix
-    //~ MatrixXf matrix_copy = 100*matrix;    
-    MatrixXi matrix_int = (matrix*100).cast<int>();
+    MatrixXi matrix_int;
+    double highest_ratio = 1.0; // needed for long term maps
     
+    // if long term maps -> scale according to highest existing ratio for nice appearance
+    if((publish_dynamic_longTerm_map && (map.header.seq == dynamicLongTermMap_seq)) || (publish_dynamic_longTerm_block_map && (map.header.seq == dynamicLongTermMap_xxl_seq))) {
+        highest_ratio = matrix.maxCoeff();
+        if(highest_ratio == 0.0) {
+            highest_ratio = 1.0;
+        }
+    }
+    
+    matrix_int = (matrix*100*1/highest_ratio).cast<int>();
+
     // transform Eigen::Matrix to Eigen::Vector
-    VectorXi vector_int = VectorXi::Map(matrix_int.data(), cells);
+    Eigen::Map<VectorXi> vector_int(matrix_int.data(), cells);
+    //~ VectorXi vector_int = VectorXi::Map(matrix_int.data(), cells);
     
     // create vector to publish map
     int init_v[cells];
@@ -227,7 +289,7 @@ void DynamicLayer::publishMap(nav_msgs::OccupancyGrid &map, Eigen::MatrixXf &mat
     for(int i=0; i<cells; i++) {
         map_vector[i] = (int8_t)vector_int[i];
     }
-    
+
     // publish map
     map.data = map_vector;
     
@@ -242,6 +304,10 @@ void DynamicLayer::publishMap(nav_msgs::OccupancyGrid &map, Eigen::MatrixXf &mat
         dynamicMapXxlPub.publish(map);
     } else if(map.header.seq == inputMap_seq) {
         inputMapPub.publish(map);
+    } else if(map.header.seq == dynamicLongTermMap_seq) {
+        dynamicLongTermMapPub.publish(map);
+    } else if(map.header.seq == dynamicLongTermMap_xxl_seq) {
+        dynamicLongTermMapXxlPub.publish(map);
     }
     
     if(debug)
@@ -538,7 +604,23 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         initInputMap();
         flag_init_input = true;
     }
-        
+    if(publish_dynamic_longTerm_map && !flag_init_dynLongTerm) {
+        initDynamicLongTermMap();
+        // init both the long term tracker as well as the counter with 0.0
+        dynamicMap_longTerm_matrix = MatrixXf::Constant(width, height, 0.0);
+        dynamicMap_longTerm_matrix_normalized = MatrixXf::Constant(width, height, 0.0);
+        dynamicMap_longTerm_counter = MatrixXf::Constant(width, height, 0.0);
+        flag_init_dynLongTerm = true;
+    }
+    if(publish_dynamic_longTerm_block_map && !flag_init_dynLongTermXxl) {
+        initDynamicLongTermMapXxl();
+        // init both the long term tracker as well as the counter with 0.0
+        dynamicMap_longTerm_xxl_matrix = MatrixXf::Constant(width_xxl, height_xxl, 0.0);
+        dynamicMap_longTerm_xxl_matrix_normalized = MatrixXf::Constant(width_xxl, height_xxl, 0.0);
+        dynamicMap_longTerm_xxl_counter = MatrixXf::Constant(width_xxl, height_xxl, 0.0);
+        flag_init_dynLongTermXxl = true;
+    }            
+    
     if(debug) {
         ROS_INFO("------------updateCosts--");
         ROS_INFO("min_i:      %i", min_i);
@@ -554,18 +636,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
     MatrixXf inputData_matrix = MatrixXf::Constant(width,height,-1);
     MatrixXf inputData_xxl_matrix = MatrixXf::Constant(width_xxl,height_xxl,-1);
         
-    //~ costmap_2d::Costmap2D* layered_costmap = layered_costmap_->getCostmap();
-    //~ unsigned int size_x = layered_costmap->getSizeInCellsX(), size_y = layered_costmap->getSizeInCellsY();
-    //~ unsigned char* master_array = layered_costmap->getCharMap();
-//~ 
-    //~ int counter_ma = 0;
-    //~ for (int j = min_j; j < max_j; j++) {
-        //~ for (int i = min_i; i < max_i; i++) {
-            //~ int index_ma = layered_costmap->getIndex(i, j);
-            //~ counter_ma++;
-        //~ }
-    //~ }
-    
+  
     if(debug) ROS_INFO_STREAM("Modnumber: " << mod_number << " ");
 
     int matrix_x, matrix_y, i_xxl, j_xxl, mat_x_xxl, mat_y_xxl;
@@ -632,7 +703,51 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
                             } else {
                                 inputData_xxl_matrix(i_xxl,j_xxl) = local_sum/(mod_number*mod_number);
                             }
-                        }            
+                            
+                            // doing dynamic long term map update here since
+                            // only look at actually perceived environment
+                            if((inputData_xxl_matrix(i_xxl,j_xxl) != NO_INFORMATION) && publish_dynamic_longTerm_block_map) {
+                                // register as perceived
+                                dynamicMap_longTerm_xxl_counter(i_xxl,j_xxl)++;
+                                // if you perceive a dynamic obstacle in that cell -> count
+                                if(dynamicMap_xxl_matrix(i_xxl,j_xxl) > upper_bound) {
+                                    dynamicMap_longTerm_xxl_matrix(i_xxl,j_xxl)++;
+                                    //~ ROS_INFO_STREAM("dynamic_xxl normalized value: " << dynamicMap_longTerm_xxl_matrix_normalized(i_xxl,j_xxl));
+                                }
+                                // reset if present in static map
+                                if(staticMap_xxl_matrix(i_xxl,j_xxl) > upper_bound) {
+                                    dynamicMap_longTerm_xxl_matrix(i_xxl,j_xxl) = 0.0;
+                                    dynamicMap_longTerm_xxl_counter(i_xxl,j_xxl) = 0.0;
+                                    dynamicMap_longTerm_xxl_matrix_normalized(i_xxl,j_xxl) = 0.0;
+                                } else {
+                                    // update normalized map also here -> saves a lot of iterations...
+                                    dynamicMap_longTerm_xxl_matrix_normalized(i_xxl,j_xxl) = dynamicMap_longTerm_xxl_matrix(i_xxl,j_xxl) / dynamicMap_longTerm_xxl_counter(i_xxl,j_xxl);
+                                }
+                                //~ ROS_INFO_STREAM("counter        = " << dynamicMap_longTerm_xxl_counter(i_xxl,j_xxl));
+                                //~ ROS_INFO_STREAM("matrix vlue    = " << dynamicMap_longTerm_xxl_matrix(i_xxl,j_xxl));
+                                //~ ROS_INFO_STREAM("xxl_normalized = " << 100*dynamicMap_longTerm_xxl_matrix_normalized(i_xxl,j_xxl));
+                            }
+                        }
+                        
+                        // doing dynamic long term map update here since
+                        // only look at actually perceived environment
+                        if((inputData_matrix(matrix_x,matrix_y) != NO_INFORMATION) && publish_dynamic_longTerm_map) {
+                            // register as perceived
+                            dynamicMap_longTerm_counter(matrix_x,matrix_y)++;
+                            // if you perceive a dynamic obstacle in that cell -> count
+                            if(dynamicMap_matrix(matrix_x,matrix_y) > upper_bound) {
+                                dynamicMap_longTerm_matrix(matrix_x,matrix_y)++;
+                            }
+                            // reset if present in static map
+                            if(staticMap_matrix(matrix_x,matrix_y) > upper_bound) {
+                                dynamicMap_longTerm_matrix(matrix_x,matrix_y) = 0.0;
+                                dynamicMap_longTerm_counter(matrix_x,matrix_y) = 0.0;
+                                dynamicMap_longTerm_matrix_normalized(matrix_x,matrix_y) = 0.0;
+                            } else {
+                                // update normalized map also here -> saves a lot of iterations...
+                                dynamicMap_longTerm_matrix_normalized(matrix_x,matrix_y) = dynamicMap_longTerm_matrix(matrix_x,matrix_y) / dynamicMap_longTerm_counter(matrix_x,matrix_y);
+                            }
+                        }
                     }
                 }
             }
@@ -687,6 +802,9 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
             updateMaps(inputData_xxl_matrix, min_x_xxl, min_y_xxl, max_x_xxl, max_y_xxl, true);
         }
         
+        // publish long term dynamic map
+
+        
         // publish Maps
         if(publish_fine_map) {
             if(debug) ROS_WARN("Right before publishing");
@@ -701,6 +819,12 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         if(publish_input_map) {
             publishMap(inputMap, inputData_matrix, n_cells);
         }
+        if(publish_dynamic_longTerm_map) {
+            publishMap(dynamicLongTermMap, dynamicMap_longTerm_matrix_normalized, n_cells);
+        }
+        if(publish_dynamic_longTerm_block_map) {
+            publishMap(dynamicLongTermMap_xxl, dynamicMap_longTerm_xxl_matrix_normalized, n_cells_xxl);
+        }    
     }
     
     // initialize staticMap with the values of the static_layer

@@ -47,6 +47,8 @@ private:
     void initDynamicMap();
     void initDynamicMapXxl();
     void initInputMap();
+    void initDynamicLongTermMap();
+    void initDynamicLongTermMapXxl();
     void transformMapToMatrix(int world_x, int world_y, int &map_x, int &map_y);
     void updateMaps(Eigen::MatrixXf &meas_mat, const int min_x, const int min_y, const int max_x, const int max_y, const bool xxl);
 
@@ -55,6 +57,12 @@ private:
     Eigen::MatrixXf staticMap_xxl_matrix;
     Eigen::MatrixXf dynamicMap_matrix;
     Eigen::MatrixXf dynamicMap_xxl_matrix;
+    Eigen::MatrixXf dynamicMap_longTerm_matrix;
+    Eigen::MatrixXf dynamicMap_longTerm_matrix_normalized;
+    Eigen::MatrixXf dynamicMap_longTerm_counter;
+    Eigen::MatrixXf dynamicMap_longTerm_xxl_matrix;
+    Eigen::MatrixXf dynamicMap_longTerm_xxl_matrix_normalized;
+    Eigen::MatrixXf dynamicMap_longTerm_xxl_counter;
     
     // maps
     nav_msgs::OccupancyGrid staticMap;
@@ -62,6 +70,8 @@ private:
     nav_msgs::OccupancyGrid dynamicMap;
     nav_msgs::OccupancyGrid dynamicMap_xxl;
     nav_msgs::OccupancyGrid inputMap;
+    nav_msgs::OccupancyGrid dynamicLongTermMap;
+    nav_msgs::OccupancyGrid dynamicLongTermMap_xxl;
     
     // identifier
     int staticMap_seq;
@@ -69,6 +79,8 @@ private:
     int dynamicMap_seq;
     int dynamicMap_xxl_seq;
     int inputMap_seq;
+    int dynamicLongTermMap_seq;
+    int dynamicLongTermMap_xxl_seq;
     
     // ROS handles
     ros::NodeHandle nh;
@@ -77,6 +89,8 @@ private:
     ros::Publisher dynamicMapPub;
     ros::Publisher dynamicMapXxlPub;
     ros::Publisher inputMapPub;
+    ros::Publisher dynamicLongTermMapPub;
+    ros::Publisher dynamicLongTermMapXxlPub;
 
     // grid data
     int height;
@@ -106,12 +120,16 @@ private:
     bool flag_init_fine;
     bool flag_init_block;
     bool flag_init_input;
+    bool flag_init_dynLongTerm;
+    bool flag_init_dynLongTermXxl;
     bool init_fine_with_map;
     bool publish_fine_map;
-    bool publish_block_map;    
+    bool publish_block_map;
+    bool publish_input_map;
+    bool publish_dynamic_longTerm_map;
+    bool publish_dynamic_longTerm_block_map;
     // debugging flags
     bool debug;
-    bool publish_input_map;
 
     // parameters algorithm
     float lower_bound;

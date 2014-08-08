@@ -107,6 +107,8 @@ dynamic_layer:
   publish_fine_map: true
   publish_block_map: true
   publish_input_map: true
-   
+  publish_dynamic_longTerm_map: false
+  publish_dynamic_longTerm_block_map: false
+
   max_cells_x: 1000
   max_cells_y: 1000

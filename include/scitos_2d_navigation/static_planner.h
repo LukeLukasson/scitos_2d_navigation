@@ -40,13 +40,16 @@ public:
 	void execute_cb(const scitos_2d_navigation::UnleashStaticPlannerGoalConstPtr &goal);
 
 protected:
+	// define states
+	enum class ReobservationState{aborted, preempted, succeeded};
+
 
     // callback for goal subscriber
     void goal_cb(const geometry_msgs::PoseStampedConstPtr &msg);
     void dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn);
     
     // helper functions
-    void check_path();
+    ReobservationState check_path();
     bool check_if_in_sight(const geometry_msgs::PoseStamped &target);
     bool pose_is_reachable(const geometry_msgs::PoseStamped &check_pose);
 	bool send_rosie_to_original_goal();

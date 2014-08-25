@@ -3,6 +3,7 @@
 
 namespace scitos_2d_navigation
 {
+
 // constructor
 StaticPlanner::StaticPlanner(std::string name) : unleash_server(nh, name, boost::bind(&StaticPlanner::execute_cb, this, _1), false), action_name(name)
 {
@@ -137,8 +138,10 @@ void StaticPlanner::dynamic_map_cb(const nav_msgs::OccupancyGrid &dynamicMapIn)
 
 };
 
-void StaticPlanner::check_path()
+StaticPlanner::ReobservationState StaticPlanner::check_path()
 {
+	StaticPlanner::ReobservationState state = ReobservationState::aborted;
+
 	// in order to block out the cb for a new goal
 	check_path_is_active = true;
 	
@@ -217,12 +220,14 @@ void StaticPlanner::check_path()
 						// no recovery needed
 						ROS_INFO("Recovery succeeded without interaction");
 						sound_play::Sound success_sound = sound_client.voiceSound("Who needs this shitty algorithm anyway?");
-						success_sound.play();					
+						success_sound.play();
+						state = ReobservationState::succeeded;			
 					} else {
 						// recovery failed
 						ROS_WARN("Recovery failed even though original goal would be reachable");
 						sound_play::Sound failed_sound = sound_client.voiceSound("I have a valid path but cannot reach the original goal.");
 						failed_sound.play();
+						state = ReobservationState::aborted;
 					}
 				} else {
 					// original pose not reachable. proably due to the dynamic obstacle in sight
@@ -236,17 +241,20 @@ void StaticPlanner::check_path()
 							ROS_INFO("Recovery succeeded with interaction");
 							sound_play::Sound success_sound = sound_client.voiceSound("I made it! Booooyyaaaah!");
 							success_sound.play();
+							state = ReobservationState::succeeded;
 						} else {
 							// recovery failed
 							ROS_WARN("Recovery failed after interaction");
 							sound_play::Sound failed_sound = sound_client.voiceSound("I have a valid path but cannot reach the original goal.");
 							failed_sound.play();
+							state = ReobservationState::aborted;
 						}
 					} else {
 						// dynamic obstacle did not move
 						ROS_WARN("Recovery failed since the dynamic obstacle did not move out of the way");
 						sound_play::Sound failed_sound = sound_client.voiceSound("If you dont want to move then I do not want to move either.");
-						failed_sound.play();					
+						failed_sound.play();
+						state = ReobservationState::aborted;					
 					}
 				}	
 			} else {
@@ -260,11 +268,13 @@ void StaticPlanner::check_path()
 							ROS_INFO("Recovery succeeded without interaction after reobserving obstacle");
 							sound_play::Sound success_sound = sound_client.voiceSound("No interaction needed. Stupid humans.");
 							success_sound.play();
+							state = ReobservationState::succeeded;
 						} else {
 							// recovery failed
 							ROS_WARN("Recovery failed even though original goal would be reachable after reobserving  obstacle");
 							sound_play::Sound failed_sound = sound_client.voiceSound("I have a valid path but cannot reach the original goal.");
 							failed_sound.play();
+							state = ReobservationState::aborted;
 						}
 					} else {
 						// original pose not reachable. proably due to the dynamic obstacle in sight
@@ -278,22 +288,26 @@ void StaticPlanner::check_path()
 								ROS_INFO("Recovery succeeded with interaction after reobserving obstacle");
 								sound_play::Sound success_sound = sound_client.voiceSound("I made it! Booooyyaaaah!");
 								success_sound.play();
+								state = ReobservationState::succeeded;
 							} else {
 								// recovery failed
 								ROS_WARN("Recovery failed after interaction after reobserving obstacle");
+								state = ReobservationState::aborted;
 							}
 						} else {
 							// dynamic obstacle did not move
 							ROS_WARN("Recovery failed since the dynamic obstacle did not move out of the way");
 							sound_play::Sound failed_sound = sound_client.voiceSound("If you dont want to move then I do not want to move either.");
 							failed_sound.play();
+							state = ReobservationState::aborted;
 						}
 					}	
 				} else {
 					// cannot reach reobservation pose
 					ROS_WARN("Recovery failed. Could not evaluate or reach a valid pose.");
 					sound_play::Sound failed_sound = sound_client.voiceSound("Cannot find any pose for reobserving the dynamic obstacle.");
-					failed_sound.play();		
+					failed_sound.play();
+					state = ReobservationState::aborted;
 				}
 			}
 			
@@ -306,6 +320,8 @@ void StaticPlanner::check_path()
     check_path_is_active = false;
     
     ROS_INFO("Finished recovery behavior static planner");
+	
+	return state;
 };			
 			
 // true: pose reachable on modified copy of global_costmap - false: anything else
@@ -454,9 +470,20 @@ void StaticPlanner::execute_cb(const scitos_2d_navigation::UnleashStaticPlannerG
 	ROS_ERROR("Executing action server call");
 	//~ subDynamicMap.shutdown();
 	//~ subGoal.shutdown();
-	check_path();
-	unleash_server.setSucceeded();
+
+	// successful?
+	if(check_path() == ReobservationState::succeeded) {
+		unleash_server.setSucceeded();
+	} else if(check_path() == ReobservationState::aborted) {
+		unleash_server.setAborted();
+	} else if(check_path() == ReobservationState::preempted) {
+		unleash_server.setPreempted();
+	} else {
+		ROS_ERROR("Static Planner recovery not ended with a valid state");
+	}
+
 };
+
 };
 
 int main( int argc, char* argv[] )

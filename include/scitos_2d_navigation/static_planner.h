@@ -104,6 +104,7 @@ protected:
 	
     // counters
     int cb_counter;
+    ros::Time time_at_call;
     
     // clients
     actionlib::SimpleActionClient<perceive_tabletop_action::FindGoalPoseAction> *pose_client;

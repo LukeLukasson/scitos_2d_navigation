@@ -56,14 +56,15 @@
         <param name="controller_frequency" value="10.0" />
         <param name="controller_patience" value="15.0" />
         <param name="planner_frequency" value="2.0" />
-        <param name="clearing_rotation_allowed" value="false" />
-		<rosparam param="recovery_behaviors"> [{name: "unleash_static_planner", type: "scitos_2d_navigation/UnleashStaticPlannerRecovery"}] </rosparam>
+		<param name="recovery_behavior_enabled" value="false" />
+		<param name="clearing_rotation_allowed" value="false" />
         <rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/costmap_common_params.yaml" command="load" ns="global_costmap" />
         <rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/local_costmap_params.yaml" command="load" />
         <rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params/global_costmap_params.yaml" command="load" />
         <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS" />
         <rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params_3d/dwa_planner_ros.yaml" command="load" />
+        <rosparam file="$(find scitos_2d_navigation)/scitos_move_base_params_3d/navfn_ros.yaml" command="load" />
 	</node>
 
 </launch>

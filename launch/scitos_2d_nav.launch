@@ -37,5 +37,8 @@
         <arg name="machine"  value="$(arg machine)"/>
         <arg name="user"  value="$(arg user)"/>
     </include>
+    <include file="$(find scitos_2d_navigation)/launch/static_planner.launch">
+        
+    </include>
 
 </launch>

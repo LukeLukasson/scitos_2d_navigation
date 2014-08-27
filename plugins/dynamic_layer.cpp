@@ -357,14 +357,16 @@ void DynamicLayer::reconfigureCB(scitos_2d_navigation::dynamic_layer_paramsConfi
     dyn_high = config.dyn_high;
     dyn_High = dyn_high/(1-dyn_high);
     
+    // stuff that needs go get published for the recovery behavior
+    staticMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/static_map", 10);
+    dynamicMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/dynamic_map_xxl", 10);
+
     // define publisher and shut them down if needed xxxPub.shutdown() ???
     if(publish_fine_map) {
-        staticMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/static_map", 10);
         dynamicMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/dynamic_map", 10);
     }
     if(publish_block_map) {
         staticMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/static_map_xxl", 10);
-        dynamicMapXxlPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/dynamic_map_xxl", 10);
     }
     if(publish_input_map) {
         inputMapPub = nh.advertise<nav_msgs::OccupancyGrid>("/move_base/" + name_ + "/input_map", 10);
@@ -584,7 +586,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
     }
     
     // handle all init here
-    if(publish_fine_map && !flag_init_fine) {
+    if(!flag_init_fine) { // init anyway -> only publishing is expensive
         initStaticMap();
         initDynamicMap();
         ROS_INFO_STREAM("Initialized fine maps with " << width << " X " << height);
@@ -592,7 +594,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         dynamicMap_matrix = MatrixXf::Constant(width, height, 0.5);
         // do not set flag_init_fine to true because we may want to initialize it with the map
     }
-    if(publish_block_map && !flag_init_block) {
+    if(!flag_init_block) { // init anyway -> only publishing is expensive
         initStaticMapXxl();
         initDynamicMapXxl();
         // init static map as 0.5 by default
@@ -600,7 +602,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         dynamicMap_xxl_matrix = MatrixXf::Constant(width_xxl, height_xxl, 0.5);
         flag_init_block = true;
     }
-    if(publish_input_map && !flag_init_input) {
+    if(!flag_init_input) { // init anyway -> only publishing is expensive
         initInputMap();
         flag_init_input = true;
     }
@@ -784,37 +786,37 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
         transformMapToMatrix(min_i, min_j, min_x, min_y);
         transformMapToMatrix(max_i, max_j, max_x, max_y);
         
-        // update static and dynamic maps
-        if(publish_fine_map) {
-            updateMaps(inputData_matrix, min_x, min_y, max_x, max_y, false);
-        }
+        // update static and dynamic maps; always do that -> only publishing is expensive
+        updateMaps(inputData_matrix, min_x, min_y, max_x, max_y, false);
         
-        // update static and dynamic xxl maps
-        if(publish_block_map) {
-            if(debug) {
-                ROS_INFO("Before publishing xxl map");
-            }
-            int min_x_xxl, min_y_xxl, max_x_xxl, max_y_xxl;
-            min_x_xxl = min_x/mod_number;
-            min_y_xxl = min_y/mod_number;
-            max_x_xxl = max_x/mod_number;
-            max_y_xxl = max_y/mod_number;
-            updateMaps(inputData_xxl_matrix, min_x_xxl, min_y_xxl, max_x_xxl, max_y_xxl, true);
+        // update static and dynamic xxl maps; always do that -> only publishing is expensive
+        if(debug) {
+            ROS_INFO("Before publishing xxl map");
         }
+        int min_x_xxl, min_y_xxl, max_x_xxl, max_y_xxl;
+        min_x_xxl = min_x/mod_number;
+        min_y_xxl = min_y/mod_number;
+        max_x_xxl = max_x/mod_number;
+        max_y_xxl = max_y/mod_number;
+        updateMaps(inputData_xxl_matrix, min_x_xxl, min_y_xxl, max_x_xxl, max_y_xxl, true);
         
         // publish long term dynamic map
 
         
         // publish Maps
+        
+        // must publishs
+        if(debug) ROS_WARN("Publishing static map and dynamic_xxl map");
+        publishMap(staticMap, staticMap_matrix, n_cells);
+        publishMap(dynamicMap_xxl, dynamicMap_xxl_matrix, n_cells_xxl);
+
+        // optional publishs
         if(publish_fine_map) {
-            if(debug) ROS_WARN("Right before publishing");
-            publishMap(staticMap, staticMap_matrix, n_cells);
+            if(debug) ROS_WARN("Publishing dynamic map");
             publishMap(dynamicMap, dynamicMap_matrix, n_cells);
-            if(debug) ROS_WARN("Right after publishing");
         }
         if(publish_block_map) {
             publishMap(staticMap_xxl, staticMap_xxl_matrix, n_cells_xxl);
-            publishMap(dynamicMap_xxl, dynamicMap_xxl_matrix, n_cells_xxl);
         }
         if(publish_input_map) {
             publishMap(inputMap, inputData_matrix, n_cells);
@@ -832,7 +834,7 @@ void DynamicLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, in
     //~ costmap_2d::Costmap2D* layered_costmap = layered_costmap_->getCostmap();
     //~ unsigned char* init_map_array = layered_costmap->getCharMap();
     //~ 
-    if(publish_fine_map && !flag_init_fine) {
+    if(!flag_init_fine) {
 		
 		// init static map blank or with map_layer?
 		if(init_fine_with_map) {
